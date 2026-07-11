@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Saharut.Domain.Entities;
 using Saharut.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Saharut.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/[controller]")]
+[Route("api/v1/companies")]
+[Authorize(Roles = "SUPER_ADMIN,OPERATIONS_MANAGER")]
 public sealed class CompaniesController : ControllerBase
 {
     private readonly SaharutDbContext _dbContext;
