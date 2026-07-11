@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Saharut.Api/Saharut.Api.csproj" />
+    <Project Path="src/Saharut.Application/Saharut.Application.csproj" />
+    <Project Path="src/Saharut.Domain/Saharut.Domain.csproj" />
+    <Project Path="src/Saharut.Infrastructure/Saharut.Infrastructure.csproj" />
+  </Folder>
+</Solution>
