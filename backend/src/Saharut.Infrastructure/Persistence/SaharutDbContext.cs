@@ -16,6 +16,7 @@ public sealed class SaharutDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<CompanyUser> CompanyUsers => Set<CompanyUser>();
+    public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,6 +27,7 @@ public sealed class SaharutDbContext : DbContext
         ConfigureRole(modelBuilder);
         ConfigureUserRole(modelBuilder);
         ConfigureCompanyUser(modelBuilder);
+        ConfigureOtpCode(modelBuilder);
     }
 
     private static void ConfigureCompany(ModelBuilder modelBuilder)
@@ -50,7 +52,6 @@ public sealed class SaharutDbContext : DbContext
                 .HasMaxLength(200);
 
             entity.HasIndex(company => company.Name);
-
             entity.HasIndex(company => company.TaxNumber);
         });
     }
@@ -158,6 +159,36 @@ public sealed class SaharutDbContext : DbContext
                 .WithMany(user => user.CompanyUsers)
                 .HasForeignKey(companyUser => companyUser.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureOtpCode(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<OtpCode>(entity =>
+        {
+            entity.ToTable("otp_codes");
+
+            entity.HasKey(otpCode => otpCode.Id);
+
+            entity.Property(otpCode => otpCode.PhoneNumber)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(otpCode => otpCode.CodeHash)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(otpCode => otpCode.IpAddress)
+                .HasMaxLength(100);
+
+            entity.HasIndex(otpCode => otpCode.PhoneNumber);
+
+            entity.HasIndex(otpCode => new
+            {
+                otpCode.PhoneNumber,
+                otpCode.IsUsed,
+                otpCode.ExpiresAt
+            });
         });
     }
 }
