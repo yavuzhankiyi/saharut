@@ -2,12 +2,13 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Saharut.Api.Common.Responses;
 using Saharut.Domain.Entities;
 using Saharut.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Authorization;
 
 namespace Saharut.Api.Controllers;
 
@@ -30,39 +31,40 @@ public sealed class AuthController : ControllerBase
     }
 
     // GET: api/v1/auth/me
-[Authorize]
-[HttpGet("me")]
-public IActionResult GetCurrentUser()
-{
-    var userId = User.FindFirstValue(
-        ClaimTypes.NameIdentifier);
-
-    var fullName = User.FindFirstValue(
-        ClaimTypes.Name);
-
-    var phoneNumber = User.FindFirstValue(
-        ClaimTypes.MobilePhone);
-
-    var email = User.FindFirstValue(
-        ClaimTypes.Email);
-
-    var roles = User.FindAll(ClaimTypes.Role)
-        .Select(claim => claim.Value)
-        .ToList();
-
-    return Ok(new
+    [Authorize]
+    [HttpGet("me")]
+    public IActionResult GetCurrentUser()
     {
-        success = true,
-        user = new
+        var userId = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        var fullName = User.FindFirstValue(
+            ClaimTypes.Name);
+
+        var phoneNumber = User.FindFirstValue(
+            ClaimTypes.MobilePhone);
+
+        var email = User.FindFirstValue(
+            ClaimTypes.Email);
+
+        var roles = User
+            .FindAll(ClaimTypes.Role)
+            .Select(claim => claim.Value)
+            .ToList();
+
+        var responseData = new
         {
             id = userId,
             fullName,
             phoneNumber,
             email,
             roles
-        }
-    });
-}
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData));
+    }
 
     // POST: api/v1/auth/send-otp
     [HttpPost("send-otp")]
@@ -70,46 +72,59 @@ public IActionResult GetCurrentUser()
         [FromBody] SendOtpRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.PhoneNumber))
+        if (string.IsNullOrWhiteSpace(
+                request.PhoneNumber))
         {
             return BadRequest(new
             {
                 success = false,
-                message = "Telefon numarası zorunludur."
+                message =
+                    "Telefon numarası zorunludur."
             });
         }
 
-        var phoneNumber = NormalizePhoneNumber(request.PhoneNumber);
+        var phoneNumber =
+            NormalizePhoneNumber(
+                request.PhoneNumber);
 
-        var userExists = await _dbContext.Users.AnyAsync(
-            user =>
-                user.PhoneNumber == phoneNumber &&
-                !user.IsDeleted &&
-                user.IsActive,
-            cancellationToken);
+        var userExists =
+            await _dbContext.Users.AnyAsync(
+                user =>
+                    user.PhoneNumber == phoneNumber &&
+                    !user.IsDeleted &&
+                    user.IsActive,
+                cancellationToken);
 
         if (!userExists)
         {
             return NotFound(new
             {
                 success = false,
-                message = "Bu telefon numarasına ait aktif kullanıcı bulunamadı."
+                message =
+                    "Bu telefon numarasına ait aktif kullanıcı bulunamadı."
             });
         }
 
-        var lastOtp = await _dbContext.OtpCodes
-            .Where(otp =>
-                otp.PhoneNumber == phoneNumber &&
-                !otp.IsDeleted)
-            .OrderByDescending(otp => otp.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+        var lastOtp =
+            await _dbContext.OtpCodes
+                .Where(otp =>
+                    otp.PhoneNumber == phoneNumber &&
+                    !otp.IsDeleted)
+                .OrderByDescending(otp =>
+                    otp.CreatedAt)
+                .FirstOrDefaultAsync(
+                    cancellationToken);
 
         if (lastOtp is not null &&
-            lastOtp.CreatedAt.AddSeconds(60) > DateTime.UtcNow)
+            lastOtp.CreatedAt.AddSeconds(60) >
+            DateTime.UtcNow)
         {
-            var remainingSeconds = (int)Math.Ceiling(
-                (lastOtp.CreatedAt.AddSeconds(60) - DateTime.UtcNow)
-                .TotalSeconds);
+            var remainingSeconds =
+                (int)Math.Ceiling(
+                    (
+                        lastOtp.CreatedAt.AddSeconds(60) -
+                        DateTime.UtcNow
+                    ).TotalSeconds);
 
             return StatusCode(
                 StatusCodes.Status429TooManyRequests,
@@ -121,50 +136,71 @@ public IActionResult GetCurrentUser()
                 });
         }
 
-        var activeCodes = await _dbContext.OtpCodes
-            .Where(otp =>
-                otp.PhoneNumber == phoneNumber &&
-                !otp.IsUsed &&
-                otp.ExpiresAt > DateTime.UtcNow &&
-                !otp.IsDeleted)
-            .ToListAsync(cancellationToken);
+        var activeCodes =
+            await _dbContext.OtpCodes
+                .Where(otp =>
+                    otp.PhoneNumber == phoneNumber &&
+                    !otp.IsUsed &&
+                    otp.ExpiresAt > DateTime.UtcNow &&
+                    !otp.IsDeleted)
+                .ToListAsync(
+                    cancellationToken);
 
         foreach (var activeCode in activeCodes)
         {
             activeCode.IsUsed = true;
-            activeCode.UpdatedAt = DateTime.UtcNow;
+            activeCode.UpdatedAt =
+                DateTime.UtcNow;
         }
 
-        var otpCode = RandomNumberGenerator
-            .GetInt32(100000, 1000000)
-            .ToString();
+        var otpCode =
+            RandomNumberGenerator
+                .GetInt32(
+                    100000,
+                    1000000)
+                .ToString();
 
         var otpEntity = new OtpCode
         {
             PhoneNumber = phoneNumber,
-            CodeHash = HashOtpCode(phoneNumber, otpCode),
-            ExpiresAt = DateTime.UtcNow.AddMinutes(3),
+
+            CodeHash = HashOtpCode(
+                phoneNumber,
+                otpCode),
+
+            ExpiresAt =
+                DateTime.UtcNow.AddMinutes(3),
+
             FailedAttemptCount = 0,
             IsUsed = false,
+
             IpAddress =
-                HttpContext.Connection.RemoteIpAddress?.ToString()
+                HttpContext.Connection
+                    .RemoteIpAddress?
+                    .ToString()
         };
 
-        _dbContext.OtpCodes.Add(otpEntity);
+        _dbContext.OtpCodes.Add(
+            otpEntity);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = "Doğrulama kodu oluşturuldu.",
             expiresInSeconds = 180,
 
             // Gerçek SMS entegrasyonunda kaldırılacak.
-            developmentCode = _environment.IsDevelopment()
-                ? otpCode
-                : null
-        });
+            developmentCode =
+                _environment.IsDevelopment()
+                    ? otpCode
+                    : null
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Doğrulama kodu oluşturuldu."));
     }
 
     // POST: api/v1/auth/verify-otp
@@ -173,8 +209,10 @@ public IActionResult GetCurrentUser()
         [FromBody] VerifyOtpRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.PhoneNumber) ||
-            string.IsNullOrWhiteSpace(request.Code))
+        if (string.IsNullOrWhiteSpace(
+                request.PhoneNumber) ||
+            string.IsNullOrWhiteSpace(
+                request.Code))
         {
             return BadRequest(new
             {
@@ -184,45 +222,56 @@ public IActionResult GetCurrentUser()
             });
         }
 
-        var phoneNumber = NormalizePhoneNumber(request.PhoneNumber);
+        var phoneNumber =
+            NormalizePhoneNumber(
+                request.PhoneNumber);
 
-        var otp = await _dbContext.OtpCodes
-            .Where(otp =>
-                otp.PhoneNumber == phoneNumber &&
-                !otp.IsUsed &&
-                !otp.IsDeleted)
-            .OrderByDescending(otp => otp.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+        var otp =
+            await _dbContext.OtpCodes
+                .Where(otp =>
+                    otp.PhoneNumber == phoneNumber &&
+                    !otp.IsUsed &&
+                    !otp.IsDeleted)
+                .OrderByDescending(otp =>
+                    otp.CreatedAt)
+                .FirstOrDefaultAsync(
+                    cancellationToken);
 
         if (otp is null)
         {
             return BadRequest(new
             {
                 success = false,
-                message = "Aktif doğrulama kodu bulunamadı."
+                message =
+                    "Aktif doğrulama kodu bulunamadı."
             });
         }
 
         if (otp.ExpiresAt <= DateTime.UtcNow)
         {
             otp.IsUsed = true;
-            otp.UpdatedAt = DateTime.UtcNow;
+            otp.UpdatedAt =
+                DateTime.UtcNow;
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(
+                cancellationToken);
 
             return BadRequest(new
             {
                 success = false,
-                message = "Doğrulama kodunun süresi dolmuş."
+                message =
+                    "Doğrulama kodunun süresi dolmuş."
             });
         }
 
         if (otp.FailedAttemptCount >= 5)
         {
             otp.IsUsed = true;
-            otp.UpdatedAt = DateTime.UtcNow;
+            otp.UpdatedAt =
+                DateTime.UtcNow;
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(
+                cancellationToken);
 
             return StatusCode(
                 StatusCodes.Status429TooManyRequests,
@@ -234,79 +283,106 @@ public IActionResult GetCurrentUser()
                 });
         }
 
-        var submittedHash = HashOtpCode(
-            phoneNumber,
-            request.Code.Trim());
+        var submittedHash =
+            HashOtpCode(
+                phoneNumber,
+                request.Code.Trim());
 
-        var isValid = CryptographicOperations.FixedTimeEquals(
-            Convert.FromHexString(otp.CodeHash),
-            Convert.FromHexString(submittedHash));
+        var isValid =
+            CryptographicOperations
+                .FixedTimeEquals(
+                    Convert.FromHexString(
+                        otp.CodeHash),
+
+                    Convert.FromHexString(
+                        submittedHash));
 
         if (!isValid)
         {
             otp.FailedAttemptCount++;
-            otp.UpdatedAt = DateTime.UtcNow;
+            otp.UpdatedAt =
+                DateTime.UtcNow;
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(
+                cancellationToken);
 
             return BadRequest(new
             {
                 success = false,
-                message = "Doğrulama kodu hatalı.",
-                remainingAttempts = Math.Max(
-                    0,
-                    5 - otp.FailedAttemptCount)
+                message =
+                    "Doğrulama kodu hatalı.",
+
+                remainingAttempts =
+                    Math.Max(
+                        0,
+                        5 - otp.FailedAttemptCount)
             });
         }
 
-        var user = await _dbContext.Users
-            .FirstOrDefaultAsync(
-                user =>
-                    user.PhoneNumber == phoneNumber &&
-                    !user.IsDeleted &&
-                    user.IsActive,
-                cancellationToken);
+        var user =
+            await _dbContext.Users
+                .FirstOrDefaultAsync(
+                    user =>
+                        user.PhoneNumber ==
+                        phoneNumber &&
+                        !user.IsDeleted &&
+                        user.IsActive,
+                    cancellationToken);
 
         if (user is null)
         {
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcı bulunamadı."
+                message =
+                    "Kullanıcı bulunamadı."
             });
         }
 
         otp.IsUsed = true;
-        otp.VerifiedAt = DateTime.UtcNow;
-        otp.UpdatedAt = DateTime.UtcNow;
+        otp.VerifiedAt =
+            DateTime.UtcNow;
+        otp.UpdatedAt =
+            DateTime.UtcNow;
 
         user.PhoneNumberConfirmed = true;
-        user.LastLoginAt = DateTime.UtcNow;
-        user.UpdatedAt = DateTime.UtcNow;
+        user.LastLoginAt =
+            DateTime.UtcNow;
+        user.UpdatedAt =
+            DateTime.UtcNow;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
-        var roleCodes = await _dbContext.UserRoles
-            .AsNoTracking()
-            .Where(userRole =>
-                userRole.UserId == user.Id &&
-                !userRole.IsDeleted &&
-                !userRole.Role.IsDeleted &&
-                userRole.Role.IsActive)
-            .Select(userRole => userRole.Role.Code)
-            .ToListAsync(cancellationToken);
+        var roleCodes =
+            await _dbContext.UserRoles
+                .AsNoTracking()
+                .Where(userRole =>
+                    userRole.UserId == user.Id &&
+                    !userRole.IsDeleted &&
+                    !userRole.Role.IsDeleted &&
+                    userRole.Role.IsActive)
+                .Select(userRole =>
+                    userRole.Role.Code)
+                .ToListAsync(
+                    cancellationToken);
 
-        var tokenResult = CreateAccessToken(
-            user,
-            roleCodes);
+        var tokenResult =
+            CreateAccessToken(
+                user,
+                roleCodes);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = "Telefon numarası başarıyla doğrulandı.",
-            accessToken = tokenResult.Token,
-            expiresAt = tokenResult.ExpiresAt,
-            tokenType = "Bearer",
+            accessToken =
+                tokenResult.Token,
+
+            expiresAt =
+                tokenResult.ExpiresAt,
+
+            tokenType =
+                "Bearer",
+
             user = new
             {
                 user.Id,
@@ -317,22 +393,30 @@ public IActionResult GetCurrentUser()
                 user.PhoneNumberConfirmed,
                 roles = roleCodes
             }
-        });
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Telefon numarası başarıyla doğrulandı."));
     }
 
     private TokenResult CreateAccessToken(
         User user,
         IReadOnlyCollection<string> roleCodes)
     {
-        var issuer = _configuration["Jwt:Issuer"]
+        var issuer =
+            _configuration["Jwt:Issuer"]
             ?? throw new InvalidOperationException(
                 "JWT Issuer bilgisi bulunamadı.");
 
-        var audience = _configuration["Jwt:Audience"]
+        var audience =
+            _configuration["Jwt:Audience"]
             ?? throw new InvalidOperationException(
                 "JWT Audience bilgisi bulunamadı.");
 
-        var secretKey = _configuration["Jwt:SecretKey"]
+        var secretKey =
+            _configuration["Jwt:SecretKey"]
             ?? throw new InvalidOperationException(
                 "JWT SecretKey bilgisi bulunamadı.");
 
@@ -341,8 +425,9 @@ public IActionResult GetCurrentUser()
                 "Jwt:AccessTokenMinutes")
             ?? 60;
 
-        var expiresAt = DateTime.UtcNow
-            .AddMinutes(accessTokenMinutes);
+        var expiresAt =
+            DateTime.UtcNow.AddMinutes(
+                accessTokenMinutes);
 
         var claims = new List<Claim>
         {
@@ -367,37 +452,45 @@ public IActionResult GetCurrentUser()
                 user.PhoneNumber)
         };
 
-        if (!string.IsNullOrWhiteSpace(user.Email))
+        if (!string.IsNullOrWhiteSpace(
+                user.Email))
         {
-            claims.Add(new Claim(
-                ClaimTypes.Email,
-                user.Email));
+            claims.Add(
+                new Claim(
+                    ClaimTypes.Email,
+                    user.Email));
         }
 
         foreach (var roleCode in roleCodes)
         {
-            claims.Add(new Claim(
-                ClaimTypes.Role,
-                roleCode));
+            claims.Add(
+                new Claim(
+                    ClaimTypes.Role,
+                    roleCode));
         }
 
-        var signingKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(secretKey));
+        var signingKey =
+            new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(
+                    secretKey));
 
-        var credentials = new SigningCredentials(
-            signingKey,
-            SecurityAlgorithms.HmacSha256);
+        var credentials =
+            new SigningCredentials(
+                signingKey,
+                SecurityAlgorithms.HmacSha256);
 
-        var token = new JwtSecurityToken(
-            issuer: issuer,
-            audience: audience,
-            claims: claims,
-            notBefore: DateTime.UtcNow,
-            expires: expiresAt,
-            signingCredentials: credentials);
+        var token =
+            new JwtSecurityToken(
+                issuer: issuer,
+                audience: audience,
+                claims: claims,
+                notBefore: DateTime.UtcNow,
+                expires: expiresAt,
+                signingCredentials: credentials);
 
-        var tokenValue = new JwtSecurityTokenHandler()
-            .WriteToken(token);
+        var tokenValue =
+            new JwtSecurityTokenHandler()
+                .WriteToken(token);
 
         return new TokenResult(
             tokenValue,
@@ -408,7 +501,8 @@ public IActionResult GetCurrentUser()
         string phoneNumber,
         string otpCode)
     {
-        var secret = _configuration["Otp:HashSecret"];
+        var secret =
+            _configuration["Otp:HashSecret"];
 
         if (string.IsNullOrWhiteSpace(secret))
         {
@@ -416,15 +510,21 @@ public IActionResult GetCurrentUser()
                 "OTP hash anahtarı yapılandırılmamış.");
         }
 
-        using var hmac = new HMACSHA256(
-            Encoding.UTF8.GetBytes(secret));
+        using var hmac =
+            new HMACSHA256(
+                Encoding.UTF8.GetBytes(
+                    secret));
 
-        var value = $"{phoneNumber}:{otpCode}";
+        var value =
+            $"{phoneNumber}:{otpCode}";
 
-        var hash = hmac.ComputeHash(
-            Encoding.UTF8.GetBytes(value));
+        var hash =
+            hmac.ComputeHash(
+                Encoding.UTF8.GetBytes(
+                    value));
 
-        return Convert.ToHexString(hash);
+        return Convert.ToHexString(
+            hash);
     }
 
     private static string NormalizePhoneNumber(
