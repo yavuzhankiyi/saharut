@@ -1,8 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Saharut.Domain.Entities;
 using Saharut.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Authorization;
 
 namespace Saharut.Api.Controllers;
 
@@ -40,7 +40,9 @@ public sealed class UsersController : ControllerBase
                 user.CreatedAt,
 
                 Roles = user.UserRoles
-                    .Where(userRole => !userRole.IsDeleted)
+                    .Where(userRole =>
+                        !userRole.IsDeleted &&
+                        !userRole.Role.IsDeleted)
                     .Select(userRole => new
                     {
                         userRole.Role.Id,
@@ -51,7 +53,8 @@ public sealed class UsersController : ControllerBase
                 Companies = user.CompanyUsers
                     .Where(companyUser =>
                         !companyUser.IsDeleted &&
-                        companyUser.IsActive)
+                        companyUser.IsActive &&
+                        !companyUser.Company.IsDeleted)
                     .Select(companyUser => new
                     {
                         companyUser.Company.Id,
@@ -88,7 +91,9 @@ public sealed class UsersController : ControllerBase
                 user.UpdatedAt,
 
                 Roles = user.UserRoles
-                    .Where(userRole => !userRole.IsDeleted)
+                    .Where(userRole =>
+                        !userRole.IsDeleted &&
+                        !userRole.Role.IsDeleted)
                     .Select(userRole => new
                     {
                         userRole.Role.Id,
@@ -99,7 +104,8 @@ public sealed class UsersController : ControllerBase
                 Companies = user.CompanyUsers
                     .Where(companyUser =>
                         !companyUser.IsDeleted &&
-                        companyUser.IsActive)
+                        companyUser.IsActive &&
+                        !companyUser.Company.IsDeleted)
                     .Select(companyUser => new
                     {
                         companyUser.Company.Id,
@@ -209,7 +215,9 @@ public sealed class UsersController : ControllerBase
                 FirstName = request.FirstName.Trim(),
                 LastName = request.LastName.Trim(),
                 PhoneNumber = normalizedPhoneNumber,
-                Email = request.Email?.Trim(),
+                Email = string.IsNullOrWhiteSpace(request.Email)
+                    ? null
+                    : request.Email.Trim(),
                 PhoneNumberConfirmed = false,
                 IsActive = true
             };
@@ -263,6 +271,199 @@ public sealed class UsersController : ControllerBase
             throw;
         }
     }
+
+    // PUT: api/v1/users/{id}
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(
+        Guid id,
+        [FromBody] UpdateUserRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.FirstName) ||
+            string.IsNullOrWhiteSpace(request.LastName) ||
+            string.IsNullOrWhiteSpace(request.PhoneNumber))
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Ad, soyad ve telefon numarası zorunludur."
+            });
+        }
+
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(
+                user =>
+                    user.Id == id &&
+                    !user.IsDeleted,
+                cancellationToken);
+
+        if (user is null)
+        {
+            return NotFound(new
+            {
+                success = false,
+                message = "Kullanıcı bulunamadı."
+            });
+        }
+
+        var normalizedPhoneNumber = request.PhoneNumber.Trim();
+
+        var phoneNumberExists = await _dbContext.Users
+            .AnyAsync(
+                otherUser =>
+                    otherUser.Id != id &&
+                    otherUser.PhoneNumber == normalizedPhoneNumber &&
+                    !otherUser.IsDeleted,
+                cancellationToken);
+
+        if (phoneNumberExists)
+        {
+            return Conflict(new
+            {
+                success = false,
+                message = "Bu telefon numarası başka bir kullanıcı tarafından kullanılıyor."
+            });
+        }
+
+        var oldPhoneNumber = user.PhoneNumber;
+
+        var phoneNumberChanged =
+            oldPhoneNumber != normalizedPhoneNumber;
+
+        user.FirstName = request.FirstName.Trim();
+        user.LastName = request.LastName.Trim();
+        user.PhoneNumber = normalizedPhoneNumber;
+        user.Email = string.IsNullOrWhiteSpace(request.Email)
+            ? null
+            : request.Email.Trim();
+        user.IsActive = request.IsActive;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        if (phoneNumberChanged)
+        {
+            user.PhoneNumberConfirmed = false;
+
+            var activeOtpCodes = await _dbContext.OtpCodes
+                .Where(otpCode =>
+                    otpCode.PhoneNumber == oldPhoneNumber &&
+                    !otpCode.IsUsed &&
+                    !otpCode.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            foreach (var otpCode in activeOtpCodes)
+            {
+                otpCode.IsUsed = true;
+                otpCode.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            message = "Kullanıcı başarıyla güncellendi.",
+            user = new
+            {
+                user.Id,
+                user.FirstName,
+                user.LastName,
+                user.PhoneNumber,
+                user.Email,
+                user.PhoneNumberConfirmed,
+                user.IsActive,
+                user.UpdatedAt
+            }
+        });
+    }
+
+    // DELETE: api/v1/users/{id}
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(
+                user =>
+                    user.Id == id &&
+                    !user.IsDeleted,
+                cancellationToken);
+
+        if (user is null)
+        {
+            return NotFound(new
+            {
+                success = false,
+                message = "Kullanıcı bulunamadı."
+            });
+        }
+
+        await using var transaction =
+            await _dbContext.Database.BeginTransactionAsync(
+                cancellationToken);
+
+        try
+        {
+            var now = DateTime.UtcNow;
+
+            user.IsDeleted = true;
+            user.IsActive = false;
+            user.UpdatedAt = now;
+
+            var userRoles = await _dbContext.UserRoles
+                .Where(userRole =>
+                    userRole.UserId == id &&
+                    !userRole.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            foreach (var userRole in userRoles)
+            {
+                userRole.IsDeleted = true;
+                userRole.UpdatedAt = now;
+            }
+
+            var companyUsers = await _dbContext.CompanyUsers
+                .Where(companyUser =>
+                    companyUser.UserId == id &&
+                    !companyUser.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            foreach (var companyUser in companyUsers)
+            {
+                companyUser.IsDeleted = true;
+                companyUser.IsActive = false;
+                companyUser.UpdatedAt = now;
+            }
+
+            var activeOtpCodes = await _dbContext.OtpCodes
+                .Where(otpCode =>
+                    otpCode.PhoneNumber == user.PhoneNumber &&
+                    !otpCode.IsUsed &&
+                    !otpCode.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            foreach (var otpCode in activeOtpCodes)
+            {
+                otpCode.IsUsed = true;
+                otpCode.UpdatedAt = now;
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return Ok(new
+            {
+                success = true,
+                message = "Kullanıcı başarıyla silindi."
+            });
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
 }
 
 public sealed record CreateUserRequest(
@@ -272,4 +473,12 @@ public sealed record CreateUserRequest(
     string? Email,
     Guid? CompanyId,
     Guid? RoleId
+);
+
+public sealed record UpdateUserRequest(
+    string FirstName,
+    string LastName,
+    string PhoneNumber,
+    string? Email,
+    bool IsActive
 );
