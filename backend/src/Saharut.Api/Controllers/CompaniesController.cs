@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Saharut.Api.Authorization;
+using Saharut.Api.Common.Pagination;
+using Saharut.Api.Common.Responses;
 using Saharut.Api.Contracts.Companies;
 using Saharut.Domain.Entities;
 using Saharut.Infrastructure.Persistence;
-using Saharut.Api.Authorization;
 
 namespace Saharut.Api.Controllers;
 
@@ -15,28 +17,26 @@ public sealed class CompaniesController : ControllerBase
 {
     private readonly SaharutDbContext _dbContext;
 
-    public CompaniesController(SaharutDbContext dbContext)
+    public CompaniesController(
+        SaharutDbContext dbContext)
     {
         _dbContext = dbContext;
     }
 
     // GET: api/v1/companies
     [HttpGet]
-[HasPermission("COMPANIES.READ")]
+    [HasPermission("COMPANIES.READ")]
     public async Task<IActionResult> GetAll(
         [FromQuery] CompanyQueryRequest request,
         CancellationToken cancellationToken)
     {
-        var page = request.Page < 1
-            ? 1
-            : request.Page;
+        var page =
+            PaginationHelper.NormalizePage(
+                request.Page);
 
-        var pageSize = request.PageSize switch
-        {
-            < 1 => 20,
-            > 100 => 100,
-            _ => request.PageSize
-        };
+        var pageSize =
+            PaginationHelper.NormalizePageSize(
+                request.PageSize);
 
         var query = _dbContext.Companies
             .AsNoTracking()
@@ -47,19 +47,31 @@ public sealed class CompaniesController : ControllerBase
             var search = request.Search.Trim();
 
             query = query.Where(company =>
-                EF.Functions.ILike(company.Name, $"%{search}%") ||
+                EF.Functions.ILike(
+                    company.Name,
+                    $"%{search}%") ||
+
                 (company.TaxNumber != null &&
-                 EF.Functions.ILike(company.TaxNumber, $"%{search}%")) ||
+                 EF.Functions.ILike(
+                     company.TaxNumber,
+                     $"%{search}%")) ||
+
                 (company.PhoneNumber != null &&
-                 EF.Functions.ILike(company.PhoneNumber, $"%{search}%")) ||
+                 EF.Functions.ILike(
+                     company.PhoneNumber,
+                     $"%{search}%")) ||
+
                 (company.Email != null &&
-                 EF.Functions.ILike(company.Email, $"%{search}%")));
+                 EF.Functions.ILike(
+                     company.Email,
+                     $"%{search}%")));
         }
 
         if (request.IsActive.HasValue)
         {
-            query = query.Where(
-                company => company.IsActive == request.IsActive.Value);
+            query = query.Where(company =>
+                company.IsActive ==
+                request.IsActive.Value);
         }
 
         var descending = string.Equals(
@@ -67,29 +79,44 @@ public sealed class CompaniesController : ControllerBase
             "desc",
             StringComparison.OrdinalIgnoreCase);
 
-        query = request.SortBy.Trim().ToLowerInvariant() switch
+        query = request.SortBy
+            .Trim()
+            .ToLowerInvariant() switch
         {
             "taxnumber" => descending
-                ? query.OrderByDescending(company => company.TaxNumber)
-                : query.OrderBy(company => company.TaxNumber),
+                ? query.OrderByDescending(
+                    company => company.TaxNumber)
+                : query.OrderBy(
+                    company => company.TaxNumber),
 
             "createdat" => descending
-                ? query.OrderByDescending(company => company.CreatedAt)
-                : query.OrderBy(company => company.CreatedAt),
+                ? query.OrderByDescending(
+                    company => company.CreatedAt)
+                : query.OrderBy(
+                    company => company.CreatedAt),
 
             "isactive" => descending
-                ? query.OrderByDescending(company => company.IsActive)
-                : query.OrderBy(company => company.IsActive),
+                ? query.OrderByDescending(
+                    company => company.IsActive)
+                : query.OrderBy(
+                    company => company.IsActive),
 
             _ => descending
-                ? query.OrderByDescending(company => company.Name)
-                : query.OrderBy(company => company.Name)
+                ? query.OrderByDescending(
+                    company => company.Name)
+                : query.OrderBy(
+                    company => company.Name)
         };
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        var totalCount =
+            await query.CountAsync(
+                cancellationToken);
 
         var companies = await query
-            .Skip((page - 1) * pageSize)
+            .Skip(
+                PaginationHelper.CalculateSkip(
+                    page,
+                    pageSize))
             .Take(pageSize)
             .Select(company => new
             {
@@ -102,39 +129,33 @@ public sealed class CompaniesController : ControllerBase
                 company.CreatedAt,
                 company.UpdatedAt,
 
-                activeUserCount = company.CompanyUsers.Count(companyUser =>
-                    !companyUser.IsDeleted &&
-                    companyUser.IsActive &&
-                    !companyUser.User.IsDeleted &&
-                    companyUser.User.IsActive),
+                activeUserCount =
+                    company.CompanyUsers.Count(
+                        companyUser =>
+                            !companyUser.IsDeleted &&
+                            companyUser.IsActive &&
+                            !companyUser.User.IsDeleted &&
+                            companyUser.User.IsActive),
 
-                totalUserCount = company.CompanyUsers.Count(companyUser =>
-                    !companyUser.IsDeleted &&
-                    !companyUser.User.IsDeleted)
+                totalUserCount =
+                    company.CompanyUsers.Count(
+                        companyUser =>
+                            !companyUser.IsDeleted &&
+                            !companyUser.User.IsDeleted)
             })
             .ToListAsync(cancellationToken);
 
-        var totalPages = totalCount == 0
-            ? 0
-            : (int)Math.Ceiling(totalCount / (double)pageSize);
-
-        return Ok(new
-        {
-            success = true,
-            data = companies,
-            pagination = new
-            {
+        return Ok(
+            PagedResponse.Create(
+                companies,
                 page,
                 pageSize,
-                totalCount,
-                totalPages
-            }
-        });
+                totalCount));
     }
 
     // GET: api/v1/companies/{id}
     [HttpGet("{id:guid}")]
-[HasPermission("COMPANIES.READ")]
+    [HasPermission("COMPANIES.READ")]
     public async Task<IActionResult> GetById(
         Guid id,
         CancellationToken cancellationToken)
@@ -155,19 +176,23 @@ public sealed class CompaniesController : ControllerBase
                 company.CreatedAt,
                 company.UpdatedAt,
 
-                activeUserCount = company.CompanyUsers.Count(companyUser =>
-                    !companyUser.IsDeleted &&
-                    companyUser.IsActive &&
-                    !companyUser.User.IsDeleted &&
-                    companyUser.User.IsActive),
+                activeUserCount =
+                    company.CompanyUsers.Count(
+                        companyUser =>
+                            !companyUser.IsDeleted &&
+                            companyUser.IsActive &&
+                            !companyUser.User.IsDeleted &&
+                            companyUser.User.IsActive),
 
                 users = company.CompanyUsers
                     .Where(companyUser =>
                         !companyUser.IsDeleted &&
                         companyUser.IsActive &&
                         !companyUser.User.IsDeleted)
-                    .OrderBy(companyUser => companyUser.User.FirstName)
-                    .ThenBy(companyUser => companyUser.User.LastName)
+                    .OrderBy(companyUser =>
+                        companyUser.User.FirstName)
+                    .ThenBy(companyUser =>
+                        companyUser.User.LastName)
                     .Select(companyUser => new
                     {
                         companyUser.User.Id,
@@ -178,7 +203,8 @@ public sealed class CompaniesController : ControllerBase
                         companyUser.User.IsActive
                     })
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(
+                cancellationToken);
 
         if (company is null)
         {
@@ -189,39 +215,40 @@ public sealed class CompaniesController : ControllerBase
             });
         }
 
-        return Ok(new
-        {
-            success = true,
-            data = company
-        });
+        return Ok(
+            ApiResponse<object>.Ok(
+                company));
     }
 
     // POST: api/v1/companies
     [HttpPost]
-[HasPermission("COMPANIES.CREATE")]
+    [HasPermission("COMPANIES.CREATE")]
     public async Task<IActionResult> Create(
         [FromBody] CreateCompanyRequest request,
         CancellationToken cancellationToken)
     {
-
         var normalizedTaxNumber =
-            NormalizeOptionalText(request.TaxNumber);
+            NormalizeOptionalText(
+                request.TaxNumber);
 
         if (normalizedTaxNumber is not null)
         {
             var taxNumberExists =
-                await _dbContext.Companies.AnyAsync(
-                    company =>
-                        company.TaxNumber == normalizedTaxNumber &&
-                        !company.IsDeleted,
-                    cancellationToken);
+                await _dbContext.Companies
+                    .AnyAsync(
+                        company =>
+                            company.TaxNumber ==
+                            normalizedTaxNumber &&
+                            !company.IsDeleted,
+                        cancellationToken);
 
             if (taxNumberExists)
             {
                 return Conflict(new
                 {
                     success = false,
-                    message = "Bu vergi numarası başka bir firma tarafından kullanılıyor."
+                    message =
+                        "Bu vergi numarası başka bir firma tarafından kullanılıyor."
                 });
             }
         }
@@ -230,43 +257,50 @@ public sealed class CompaniesController : ControllerBase
         {
             Name = request.Name.Trim(),
             TaxNumber = normalizedTaxNumber,
-            PhoneNumber = NormalizeOptionalText(request.PhoneNumber),
-            Email = NormalizeOptionalText(request.Email),
+            PhoneNumber =
+                NormalizeOptionalText(
+                    request.PhoneNumber),
+            Email =
+                NormalizeOptionalText(
+                    request.Email),
             IsActive = true
         };
 
         _dbContext.Companies.Add(company);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        var responseData = new
+        {
+            company.Id,
+            company.Name,
+            company.TaxNumber,
+            company.PhoneNumber,
+            company.Email,
+            company.IsActive,
+            company.CreatedAt
+        };
 
         return CreatedAtAction(
             nameof(GetById),
-            new { id = company.Id },
             new
             {
-                success = true,
-                message = "Firma başarıyla oluşturuldu.",
-                data = new
-                {
-                    company.Id,
-                    company.Name,
-                    company.TaxNumber,
-                    company.PhoneNumber,
-                    company.Email,
-                    company.IsActive,
-                    company.CreatedAt
-                }
-            });
+                id = company.Id
+            },
+            ApiResponse<object>.Created(
+                responseData,
+                "Firma başarıyla oluşturuldu."));
     }
 
     // PUT: api/v1/companies/{id}
     [HttpPut("{id:guid}")]
-[HasPermission("COMPANIES.UPDATE")]
+    [HasPermission("COMPANIES.UPDATE")]
     public async Task<IActionResult> Update(
         Guid id,
         [FromBody] UpdateCompanyRequest request,
         CancellationToken cancellationToken)
     {
-
         var company = await _dbContext.Companies
             .FirstOrDefaultAsync(
                 company =>
@@ -283,74 +317,95 @@ public sealed class CompaniesController : ControllerBase
             });
         }
 
-        if (!request.IsActive && company.IsActive)
+        if (!request.IsActive &&
+            company.IsActive)
         {
-            var hasActiveUsers = await HasActiveUsersAsync(
-                id,
-                cancellationToken);
+            var hasActiveUsers =
+                await HasActiveUsersAsync(
+                    id,
+                    cancellationToken);
 
             if (hasActiveUsers)
             {
                 return Conflict(new
                 {
                     success = false,
-                    message = "Aktif kullanıcılara sahip firma pasif yapılamaz."
+                    message =
+                        "Aktif kullanıcılara sahip firma pasif yapılamaz."
                 });
             }
         }
 
         var normalizedTaxNumber =
-            NormalizeOptionalText(request.TaxNumber);
+            NormalizeOptionalText(
+                request.TaxNumber);
 
         if (normalizedTaxNumber is not null)
         {
             var taxNumberExists =
-                await _dbContext.Companies.AnyAsync(
-                    otherCompany =>
-                        otherCompany.Id != id &&
-                        otherCompany.TaxNumber == normalizedTaxNumber &&
-                        !otherCompany.IsDeleted,
-                    cancellationToken);
+                await _dbContext.Companies
+                    .AnyAsync(
+                        otherCompany =>
+                            otherCompany.Id != id &&
+                            otherCompany.TaxNumber ==
+                            normalizedTaxNumber &&
+                            !otherCompany.IsDeleted,
+                        cancellationToken);
 
             if (taxNumberExists)
             {
                 return Conflict(new
                 {
                     success = false,
-                    message = "Bu vergi numarası başka bir firma tarafından kullanılıyor."
+                    message =
+                        "Bu vergi numarası başka bir firma tarafından kullanılıyor."
                 });
             }
         }
 
-        company.Name = request.Name.Trim();
-        company.TaxNumber = normalizedTaxNumber;
-        company.PhoneNumber = NormalizeOptionalText(request.PhoneNumber);
-        company.Email = NormalizeOptionalText(request.Email);
-        company.IsActive = request.IsActive;
-        company.UpdatedAt = DateTime.UtcNow;
+        company.Name =
+            request.Name.Trim();
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        company.TaxNumber =
+            normalizedTaxNumber;
 
-        return Ok(new
+        company.PhoneNumber =
+            NormalizeOptionalText(
+                request.PhoneNumber);
+
+        company.Email =
+            NormalizeOptionalText(
+                request.Email);
+
+        company.IsActive =
+            request.IsActive;
+
+        company.UpdatedAt =
+            DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        var responseData = new
         {
-            success = true,
-            message = "Firma başarıyla güncellendi.",
-            data = new
-            {
-                company.Id,
-                company.Name,
-                company.TaxNumber,
-                company.PhoneNumber,
-                company.Email,
-                company.IsActive,
-                company.UpdatedAt
-            }
-        });
+            company.Id,
+            company.Name,
+            company.TaxNumber,
+            company.PhoneNumber,
+            company.Email,
+            company.IsActive,
+            company.UpdatedAt
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Firma başarıyla güncellendi."));
     }
 
     // PATCH: api/v1/companies/{id}/status
     [HttpPatch("{id:guid}/status")]
-[HasPermission("COMPANIES.UPDATE")]
+    [HasPermission("COMPANIES.UPDATE")]
     public async Task<IActionResult> SetStatus(
         Guid id,
         [FromBody] SetCompanyStatusRequest request,
@@ -372,45 +427,54 @@ public sealed class CompaniesController : ControllerBase
             });
         }
 
-        if (!request.IsActive && company.IsActive)
+        if (!request.IsActive &&
+            company.IsActive)
         {
-            var hasActiveUsers = await HasActiveUsersAsync(
-                id,
-                cancellationToken);
+            var hasActiveUsers =
+                await HasActiveUsersAsync(
+                    id,
+                    cancellationToken);
 
             if (hasActiveUsers)
             {
                 return Conflict(new
                 {
                     success = false,
-                    message = "Aktif kullanıcılara sahip firma pasif yapılamaz."
+                    message =
+                        "Aktif kullanıcılara sahip firma pasif yapılamaz."
                 });
             }
         }
 
-        company.IsActive = request.IsActive;
-        company.UpdatedAt = DateTime.UtcNow;
+        company.IsActive =
+            request.IsActive;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        company.UpdatedAt =
+            DateTime.UtcNow;
 
-        return Ok(new
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        var responseData = new
         {
-            success = true,
-            message = request.IsActive
-                ? "Firma aktif hâle getirildi."
-                : "Firma pasif hâle getirildi.",
-            data = new
-            {
-                company.Id,
-                company.IsActive,
-                company.UpdatedAt
-            }
-        });
+            company.Id,
+            company.IsActive,
+            company.UpdatedAt
+        };
+
+        var message = request.IsActive
+            ? "Firma aktif hâle getirildi."
+            : "Firma pasif hâle getirildi.";
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                message));
     }
 
     // DELETE: api/v1/companies/{id}
     [HttpDelete("{id:guid}")]
-[HasPermission("COMPANIES.DELETE")]
+    [HasPermission("COMPANIES.DELETE")]
     public async Task<IActionResult> Delete(
         Guid id,
         CancellationToken cancellationToken)
@@ -431,20 +495,22 @@ public sealed class CompaniesController : ControllerBase
             });
         }
 
-        var hasAssignedUsers = await _dbContext.CompanyUsers
-            .AnyAsync(
-                companyUser =>
-                    companyUser.CompanyId == id &&
-                    !companyUser.IsDeleted &&
-                    !companyUser.User.IsDeleted,
-                cancellationToken);
+        var hasAssignedUsers =
+            await _dbContext.CompanyUsers
+                .AnyAsync(
+                    companyUser =>
+                        companyUser.CompanyId == id &&
+                        !companyUser.IsDeleted &&
+                        !companyUser.User.IsDeleted,
+                    cancellationToken);
 
         if (hasAssignedUsers)
         {
             return Conflict(new
             {
                 success = false,
-                message = "Kullanıcılara atanmış firma silinemez."
+                message =
+                    "Kullanıcılara atanmış firma silinemez."
             });
         }
 
@@ -452,30 +518,32 @@ public sealed class CompaniesController : ControllerBase
         company.IsActive = false;
         company.UpdatedAt = DateTime.UtcNow;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
-        return Ok(new
-        {
-            success = true,
-            message = "Firma başarıyla silindi."
-        });
+        return Ok(
+            MessageResponse.Ok(
+                "Firma başarıyla silindi."));
     }
 
     private async Task<bool> HasActiveUsersAsync(
         Guid companyId,
         CancellationToken cancellationToken)
     {
-        return await _dbContext.CompanyUsers.AnyAsync(
-            companyUser =>
-                companyUser.CompanyId == companyId &&
-                !companyUser.IsDeleted &&
-                companyUser.IsActive &&
-                !companyUser.User.IsDeleted &&
-                companyUser.User.IsActive,
-            cancellationToken);
+        return await _dbContext.CompanyUsers
+            .AnyAsync(
+                companyUser =>
+                    companyUser.CompanyId ==
+                    companyId &&
+                    !companyUser.IsDeleted &&
+                    companyUser.IsActive &&
+                    !companyUser.User.IsDeleted &&
+                    companyUser.User.IsActive,
+                cancellationToken);
     }
 
-    private static string? NormalizeOptionalText(string? value)
+    private static string? NormalizeOptionalText(
+        string? value)
     {
         return string.IsNullOrWhiteSpace(value)
             ? null

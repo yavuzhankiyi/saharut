@@ -1,0 +1,27 @@
+namespace Saharut.Api.Common.Responses;
+
+public sealed record ApiResponse<T>(
+    bool Success,
+    T? Data,
+    string? Message = null)
+{
+    public static ApiResponse<T> Ok(
+        T data,
+        string? message = null)
+    {
+        return new ApiResponse<T>(
+            true,
+            data,
+            message);
+    }
+
+    public static ApiResponse<T> Created(
+        T data,
+        string? message = null)
+    {
+        return new ApiResponse<T>(
+            true,
+            data,
+            message);
+    }
+}
