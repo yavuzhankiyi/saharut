@@ -1,6 +1,7 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Saharut.Api.Authorization;
 using Saharut.Api.Contracts.Roles;
 using Saharut.Domain.Entities;
 using Saharut.Infrastructure.Persistence;
@@ -9,7 +10,7 @@ namespace Saharut.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/roles")]
-[Authorize(Roles = "SUPER_ADMIN")]
+[Authorize]
 public sealed class RolesController : ControllerBase
 {
     private static readonly HashSet<string> ProtectedRoleCodes =
@@ -32,6 +33,7 @@ public sealed class RolesController : ControllerBase
 
     // GET: api/v1/roles
     [HttpGet]
+    [HasPermission("ROLES.READ")]
     public async Task<IActionResult> GetAll(
         [FromQuery] RoleQueryRequest request,
         CancellationToken cancellationToken)
@@ -132,6 +134,7 @@ public sealed class RolesController : ControllerBase
 
     // GET: api/v1/roles/{id}
     [HttpGet("{id:guid}")]
+    [HasPermission("ROLES.READ")]
     public async Task<IActionResult> GetById(
         Guid id,
         CancellationToken cancellationToken)
@@ -176,7 +179,7 @@ public sealed class RolesController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Rol bulunamadı."
+                message = "Rol bulunamadÄ±."
             });
         }
 
@@ -189,6 +192,7 @@ public sealed class RolesController : ControllerBase
 
     // POST: api/v1/roles
     [HttpPost]
+    [HasPermission("ROLES.CREATE")]
     public async Task<IActionResult> Create(
         [FromBody] CreateRoleRequest request,
         CancellationToken cancellationToken)
@@ -199,7 +203,7 @@ public sealed class RolesController : ControllerBase
             return BadRequest(new
             {
                 success = false,
-                message = "Rol adı ve rol kodu zorunludur."
+                message = "Rol adÄ± ve rol kodu zorunludur."
             });
         }
 
@@ -216,7 +220,7 @@ public sealed class RolesController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Bu rol kodu zaten kullanılıyor."
+                message = "Bu rol kodu zaten kullanÄ±lÄ±yor."
             });
         }
 
@@ -237,7 +241,7 @@ public sealed class RolesController : ControllerBase
             new
             {
                 success = true,
-                message = "Rol başarıyla oluşturuldu.",
+                message = "Rol baÅŸarÄ±yla oluÅŸturuldu.",
                 data = new
                 {
                     role.Id,
@@ -251,6 +255,7 @@ public sealed class RolesController : ControllerBase
 
     // PUT: api/v1/roles/{id}
     [HttpPut("{id:guid}")]
+    [HasPermission("ROLES.UPDATE")]
     public async Task<IActionResult> Update(
         Guid id,
         [FromBody] UpdateRoleRequest request,
@@ -262,7 +267,7 @@ public sealed class RolesController : ControllerBase
             return BadRequest(new
             {
                 success = false,
-                message = "Rol adı ve rol kodu zorunludur."
+                message = "Rol adÄ± ve rol kodu zorunludur."
             });
         }
 
@@ -278,7 +283,7 @@ public sealed class RolesController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Rol bulunamadı."
+                message = "Rol bulunamadÄ±."
             });
         }
 
@@ -293,7 +298,7 @@ public sealed class RolesController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Sistem rollerinin kodu değiştirilemez."
+                message = "Sistem rollerinin kodu deÄŸiÅŸtirilemez."
             });
         }
 
@@ -309,7 +314,7 @@ public sealed class RolesController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Bu rol kodu başka bir rol tarafından kullanılıyor."
+                message = "Bu rol kodu baÅŸka bir rol tarafÄ±ndan kullanÄ±lÄ±yor."
             });
         }
 
@@ -320,7 +325,7 @@ public sealed class RolesController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Sistem rolleri pasif yapılamaz."
+                message = "Sistem rolleri pasif yapÄ±lamaz."
             });
         }
 
@@ -335,7 +340,7 @@ public sealed class RolesController : ControllerBase
         return Ok(new
         {
             success = true,
-            message = "Rol başarıyla güncellendi.",
+            message = "Rol baÅŸarÄ±yla gÃ¼ncellendi.",
             data = new
             {
                 role.Id,
@@ -350,6 +355,7 @@ public sealed class RolesController : ControllerBase
 
     // PATCH: api/v1/roles/{id}/status
     [HttpPatch("{id:guid}/status")]
+    [HasPermission("ROLES.UPDATE")]
     public async Task<IActionResult> SetStatus(
         Guid id,
         [FromBody] SetRoleStatusRequest request,
@@ -367,7 +373,7 @@ public sealed class RolesController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Rol bulunamadı."
+                message = "Rol bulunamadÄ±."
             });
         }
 
@@ -377,7 +383,7 @@ public sealed class RolesController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Sistem rolleri pasif yapılamaz."
+                message = "Sistem rolleri pasif yapÄ±lamaz."
             });
         }
 
@@ -396,7 +402,7 @@ public sealed class RolesController : ControllerBase
                 return Conflict(new
                 {
                     success = false,
-                    message = "Aktif kullanıcılara atanmış rol pasif yapılamaz."
+                    message = "Aktif kullanÄ±cÄ±lara atanmÄ±ÅŸ rol pasif yapÄ±lamaz."
                 });
             }
         }
@@ -410,8 +416,8 @@ public sealed class RolesController : ControllerBase
         {
             success = true,
             message = request.IsActive
-                ? "Rol aktif hâle getirildi."
-                : "Rol pasif hâle getirildi.",
+                ? "Rol aktif hÃ¢le getirildi."
+                : "Rol pasif hÃ¢le getirildi.",
             data = new
             {
                 role.Id,
@@ -423,6 +429,7 @@ public sealed class RolesController : ControllerBase
 
     // DELETE: api/v1/roles/{id}
     [HttpDelete("{id:guid}")]
+    [HasPermission("ROLES.DELETE")]
     public async Task<IActionResult> Delete(
         Guid id,
         CancellationToken cancellationToken)
@@ -439,7 +446,7 @@ public sealed class RolesController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Rol bulunamadı."
+                message = "Rol bulunamadÄ±."
             });
         }
 
@@ -464,7 +471,7 @@ public sealed class RolesController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Kullanıcılara atanmış rol silinemez."
+                message = "KullanÄ±cÄ±lara atanmÄ±ÅŸ rol silinemez."
             });
         }
 
@@ -477,7 +484,7 @@ public sealed class RolesController : ControllerBase
         return Ok(new
         {
             success = true,
-            message = "Rol başarıyla silindi."
+            message = "Rol baÅŸarÄ±yla silindi."
         });
     }
 

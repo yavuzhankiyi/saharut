@@ -1,7 +1,8 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Saharut.Api.Authorization;
 using Saharut.Api.Contracts.Users;
 using Saharut.Domain.Entities;
 using Saharut.Infrastructure.Persistence;
@@ -10,7 +11,7 @@ namespace Saharut.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/users")]
-[Authorize(Roles = "SUPER_ADMIN,OPERATIONS_MANAGER")]
+[Authorize]
 public sealed class UsersController : ControllerBase
 {
     private const string SuperAdminRoleCode = "SUPER_ADMIN";
@@ -24,6 +25,7 @@ public sealed class UsersController : ControllerBase
 
     // GET: api/v1/users
     [HttpGet]
+    [HasPermission("USERS.READ")]
     public async Task<IActionResult> GetAll(
         [FromQuery] UserQueryRequest request,
         CancellationToken cancellationToken)
@@ -178,6 +180,7 @@ public sealed class UsersController : ControllerBase
 
     // GET: api/v1/users/{id}
     [HttpGet("{id:guid}")]
+    [HasPermission("USERS.READ")]
     public async Task<IActionResult> GetById(
         Guid id,
         CancellationToken cancellationToken)
@@ -233,7 +236,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcı bulunamadı."
+                message = "KullanÄ±cÄ± bulunamadÄ±."
             });
         }
 
@@ -246,6 +249,7 @@ public sealed class UsersController : ControllerBase
 
     // POST: api/v1/users
     [HttpPost]
+    [HasPermission("USERS.CREATE")]
     public async Task<IActionResult> Create(
         [FromBody] CreateUserRequest request,
         CancellationToken cancellationToken)
@@ -257,7 +261,7 @@ public sealed class UsersController : ControllerBase
             return BadRequest(new
             {
                 success = false,
-                message = "Ad, soyad ve telefon numarası zorunludur."
+                message = "Ad, soyad ve telefon numarasÄ± zorunludur."
             });
         }
 
@@ -274,7 +278,7 @@ public sealed class UsersController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Bu telefon numarası zaten kullanılıyor."
+                message = "Bu telefon numarasÄ± zaten kullanÄ±lÄ±yor."
             });
         }
 
@@ -295,7 +299,7 @@ public sealed class UsersController : ControllerBase
                 return BadRequest(new
                 {
                     success = false,
-                    message = "Seçilen firma bulunamadı veya aktif değil."
+                    message = "SeÃ§ilen firma bulunamadÄ± veya aktif deÄŸil."
                 });
             }
         }
@@ -317,7 +321,7 @@ public sealed class UsersController : ControllerBase
                 return BadRequest(new
                 {
                     success = false,
-                    message = "Seçilen rol bulunamadı veya aktif değil."
+                    message = "SeÃ§ilen rol bulunamadÄ± veya aktif deÄŸil."
                 });
             }
         }
@@ -369,7 +373,7 @@ public sealed class UsersController : ControllerBase
                 new
                 {
                     success = true,
-                    message = "Kullanıcı başarıyla oluşturuldu.",
+                    message = "KullanÄ±cÄ± baÅŸarÄ±yla oluÅŸturuldu.",
                     data = new
                     {
                         user.Id,
@@ -394,6 +398,7 @@ public sealed class UsersController : ControllerBase
 
     // PUT: api/v1/users/{id}
     [HttpPut("{id:guid}")]
+    [HasPermission("USERS.UPDATE")]
     public async Task<IActionResult> Update(
         Guid id,
         [FromBody] UpdateUserRequest request,
@@ -406,7 +411,7 @@ public sealed class UsersController : ControllerBase
             return BadRequest(new
             {
                 success = false,
-                message = "Ad, soyad ve telefon numarası zorunludur."
+                message = "Ad, soyad ve telefon numarasÄ± zorunludur."
             });
         }
 
@@ -422,7 +427,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcı bulunamadı."
+                message = "KullanÄ±cÄ± bulunamadÄ±."
             });
         }
 
@@ -431,7 +436,7 @@ public sealed class UsersController : ControllerBase
             var protectionResult =
                 await CheckSuperAdminProtectionAsync(
                     id,
-                    "Son aktif SUPER_ADMIN kullanıcısı pasif yapılamaz.",
+                    "Son aktif SUPER_ADMIN kullanÄ±cÄ±sÄ± pasif yapÄ±lamaz.",
                     cancellationToken);
 
             if (protectionResult is not null)
@@ -455,7 +460,7 @@ public sealed class UsersController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Bu telefon numarası başka bir kullanıcı tarafından kullanılıyor."
+                message = "Bu telefon numarasÄ± baÅŸka bir kullanÄ±cÄ± tarafÄ±ndan kullanÄ±lÄ±yor."
             });
         }
 
@@ -485,7 +490,7 @@ public sealed class UsersController : ControllerBase
         return Ok(new
         {
             success = true,
-            message = "Kullanıcı başarıyla güncellendi.",
+            message = "KullanÄ±cÄ± baÅŸarÄ±yla gÃ¼ncellendi.",
             data = new
             {
                 user.Id,
@@ -502,6 +507,7 @@ public sealed class UsersController : ControllerBase
 
     // PATCH: api/v1/users/{id}/status
     [HttpPatch("{id:guid}/status")]
+    [HasPermission("USERS.UPDATE")]
     public async Task<IActionResult> SetStatus(
         Guid id,
         [FromBody] SetUserStatusRequest request,
@@ -519,7 +525,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcı bulunamadı."
+                message = "KullanÄ±cÄ± bulunamadÄ±."
             });
         }
 
@@ -532,14 +538,14 @@ public sealed class UsersController : ControllerBase
                 return Conflict(new
                 {
                     success = false,
-                    message = "Kendi kullanıcı hesabınızı pasif yapamazsınız."
+                    message = "Kendi kullanÄ±cÄ± hesabÄ±nÄ±zÄ± pasif yapamazsÄ±nÄ±z."
                 });
             }
 
             var protectionResult =
                 await CheckSuperAdminProtectionAsync(
                     id,
-                    "Son aktif SUPER_ADMIN kullanıcısı pasif yapılamaz.",
+                    "Son aktif SUPER_ADMIN kullanÄ±cÄ±sÄ± pasif yapÄ±lamaz.",
                     cancellationToken);
 
             if (protectionResult is not null)
@@ -565,8 +571,8 @@ public sealed class UsersController : ControllerBase
         {
             success = true,
             message = request.IsActive
-                ? "Kullanıcı aktif hâle getirildi."
-                : "Kullanıcı pasif hâle getirildi.",
+                ? "KullanÄ±cÄ± aktif hÃ¢le getirildi."
+                : "KullanÄ±cÄ± pasif hÃ¢le getirildi.",
             data = new
             {
                 user.Id,
@@ -578,6 +584,7 @@ public sealed class UsersController : ControllerBase
 
     // POST: api/v1/users/{id}/roles
     [HttpPost("{id:guid}/roles")]
+    [HasPermission("USERS.UPDATE")]
     public async Task<IActionResult> AssignRole(
         Guid id,
         [FromBody] AssignRoleRequest request,
@@ -596,7 +603,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcı bulunamadı veya aktif değil."
+                message = "KullanÄ±cÄ± bulunamadÄ± veya aktif deÄŸil."
             });
         }
 
@@ -613,7 +620,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Rol bulunamadı veya aktif değil."
+                message = "Rol bulunamadÄ± veya aktif deÄŸil."
             });
         }
 
@@ -631,7 +638,7 @@ public sealed class UsersController : ControllerBase
                 return Conflict(new
                 {
                     success = false,
-                    message = "Bu rol kullanıcıya zaten atanmış."
+                    message = "Bu rol kullanÄ±cÄ±ya zaten atanmÄ±ÅŸ."
                 });
             }
 
@@ -652,7 +659,7 @@ public sealed class UsersController : ControllerBase
         return Ok(new
         {
             success = true,
-            message = "Rol kullanıcıya başarıyla atandı.",
+            message = "Rol kullanÄ±cÄ±ya baÅŸarÄ±yla atandÄ±.",
             data = new
             {
                 role.Id,
@@ -664,6 +671,7 @@ public sealed class UsersController : ControllerBase
 
     // DELETE: api/v1/users/{id}/roles/{roleId}
     [HttpDelete("{id:guid}/roles/{roleId:guid}")]
+    [HasPermission("USERS.UPDATE")]
     public async Task<IActionResult> RemoveRole(
         Guid id,
         Guid roleId,
@@ -681,7 +689,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcı bulunamadı."
+                message = "KullanÄ±cÄ± bulunamadÄ±."
             });
         }
 
@@ -699,7 +707,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcıya atanmış böyle bir rol bulunamadı."
+                message = "KullanÄ±cÄ±ya atanmÄ±ÅŸ bÃ¶yle bir rol bulunamadÄ±."
             });
         }
 
@@ -712,14 +720,14 @@ public sealed class UsersController : ControllerBase
                 return Conflict(new
                 {
                     success = false,
-                    message = "Kendi SUPER_ADMIN rolünüzü kaldıramazsınız."
+                    message = "Kendi SUPER_ADMIN rolÃ¼nÃ¼zÃ¼ kaldÄ±ramazsÄ±nÄ±z."
                 });
             }
 
             var protectionResult =
                 await CheckSuperAdminProtectionAsync(
                     id,
-                    "Son aktif SUPER_ADMIN rolü kaldırılamaz.",
+                    "Son aktif SUPER_ADMIN rolÃ¼ kaldÄ±rÄ±lamaz.",
                     cancellationToken);
 
             if (protectionResult is not null)
@@ -736,7 +744,7 @@ public sealed class UsersController : ControllerBase
         return Ok(new
         {
             success = true,
-            message = "Rol kullanıcıdan başarıyla kaldırıldı.",
+            message = "Rol kullanÄ±cÄ±dan baÅŸarÄ±yla kaldÄ±rÄ±ldÄ±.",
             data = new
             {
                 userRole.Role.Id,
@@ -748,6 +756,7 @@ public sealed class UsersController : ControllerBase
 
     // POST: api/v1/users/{id}/companies
     [HttpPost("{id:guid}/companies")]
+    [HasPermission("USERS.UPDATE")]
     public async Task<IActionResult> AssignCompany(
         Guid id,
         [FromBody] AssignCompanyRequest request,
@@ -766,7 +775,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcı bulunamadı veya aktif değil."
+                message = "KullanÄ±cÄ± bulunamadÄ± veya aktif deÄŸil."
             });
         }
 
@@ -783,7 +792,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Firma bulunamadı veya aktif değil."
+                message = "Firma bulunamadÄ± veya aktif deÄŸil."
             });
         }
 
@@ -802,7 +811,7 @@ public sealed class UsersController : ControllerBase
                 return Conflict(new
                 {
                     success = false,
-                    message = "Bu firma kullanıcıya zaten atanmış."
+                    message = "Bu firma kullanÄ±cÄ±ya zaten atanmÄ±ÅŸ."
                 });
             }
 
@@ -825,7 +834,7 @@ public sealed class UsersController : ControllerBase
         return Ok(new
         {
             success = true,
-            message = "Firma kullanıcıya başarıyla atandı.",
+            message = "Firma kullanÄ±cÄ±ya baÅŸarÄ±yla atandÄ±.",
             data = new
             {
                 company.Id,
@@ -836,6 +845,7 @@ public sealed class UsersController : ControllerBase
 
     // DELETE: api/v1/users/{id}/companies/{companyId}
     [HttpDelete("{id:guid}/companies/{companyId:guid}")]
+    [HasPermission("USERS.UPDATE")]
     public async Task<IActionResult> RemoveCompany(
         Guid id,
         Guid companyId,
@@ -852,7 +862,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcı bulunamadı."
+                message = "KullanÄ±cÄ± bulunamadÄ±."
             });
         }
 
@@ -871,7 +881,7 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcıya atanmış böyle bir firma bulunamadı."
+                message = "KullanÄ±cÄ±ya atanmÄ±ÅŸ bÃ¶yle bir firma bulunamadÄ±."
             });
         }
 
@@ -884,7 +894,7 @@ public sealed class UsersController : ControllerBase
         return Ok(new
         {
             success = true,
-            message = "Firma kullanıcıdan başarıyla kaldırıldı.",
+            message = "Firma kullanÄ±cÄ±dan baÅŸarÄ±yla kaldÄ±rÄ±ldÄ±.",
             data = new
             {
                 companyUser.Company.Id,
@@ -895,6 +905,7 @@ public sealed class UsersController : ControllerBase
 
     // DELETE: api/v1/users/{id}
     [HttpDelete("{id:guid}")]
+    [HasPermission("USERS.DELETE")]
     public async Task<IActionResult> Delete(
         Guid id,
         CancellationToken cancellationToken)
@@ -906,7 +917,7 @@ public sealed class UsersController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Kendi kullanıcı hesabınızı silemezsiniz."
+                message = "Kendi kullanÄ±cÄ± hesabÄ±nÄ±zÄ± silemezsiniz."
             });
         }
 
@@ -922,14 +933,14 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Kullanıcı bulunamadı."
+                message = "KullanÄ±cÄ± bulunamadÄ±."
             });
         }
 
         var protectionResult =
             await CheckSuperAdminProtectionAsync(
                 id,
-                "Son aktif SUPER_ADMIN kullanıcısı silinemez.",
+                "Son aktif SUPER_ADMIN kullanÄ±cÄ±sÄ± silinemez.",
                 cancellationToken);
 
         if (protectionResult is not null)
@@ -985,7 +996,7 @@ public sealed class UsersController : ControllerBase
             return Ok(new
             {
                 success = true,
-                message = "Kullanıcı başarıyla silindi."
+                message = "KullanÄ±cÄ± baÅŸarÄ±yla silindi."
             });
         }
         catch
