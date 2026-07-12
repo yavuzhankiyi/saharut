@@ -76,6 +76,18 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// Migration ve başlangıç verileri
+await using (var scope =
+             app.Services.CreateAsyncScope())
+{
+    var dbContext = scope.ServiceProvider
+        .GetRequiredService<SaharutDbContext>();
+
+    await dbContext.Database.MigrateAsync();
+
+    await DatabaseSeeder.SeedAsync(dbContext);
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
