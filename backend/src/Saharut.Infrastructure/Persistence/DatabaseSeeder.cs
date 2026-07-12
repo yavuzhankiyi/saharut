@@ -113,7 +113,13 @@ public static class DatabaseSeeder
             "Role Yetki Atama",
             "PERMISSIONS.ASSIGN",
             "PERMISSIONS",
-            "Rollere permission atama ve rol üzerinden permission kaldırma yetkisi.")
+            "Rollere permission atama ve rol üzerinden permission kaldırma yetkisi."),
+
+            new(
+    "Audit Log Görüntüleme",
+    "AUDIT_LOGS.READ",
+    "AUDIT_LOGS",
+    "Sistem işlem geçmişini ve kayıt değişikliklerini görüntüleme yetkisi.")
     ];
 
     private static readonly IReadOnlyDictionary<string, string[]>

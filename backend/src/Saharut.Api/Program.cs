@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Saharut.Api.Authorization;
+using Saharut.Infrastructure.Auditing;
 using Saharut.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,9 +26,22 @@ var jwtSecretKey = builder.Configuration["Jwt:SecretKey"]
     ?? throw new InvalidOperationException(
         "JWT SecretKey bilgisi bulunamadı.");
 
-// Veritabanı
-builder.Services.AddDbContext<SaharutDbContext>(options =>
-    options.UseNpgsql(connectionString));
+// HTTP request bilgilerine Infrastructure katmanından erişebilmek için
+builder.Services.AddHttpContextAccessor();
+
+// Audit interceptor
+builder.Services.AddScoped<AuditSaveChangesInterceptor>();
+
+// PostgreSQL ve audit interceptor bağlantısı
+builder.Services.AddDbContext<SaharutDbContext>(
+    (serviceProvider, options) =>
+    {
+        options.UseNpgsql(connectionString);
+
+        options.AddInterceptors(
+            serviceProvider.GetRequiredService<
+                AuditSaveChangesInterceptor>());
+    });
 
 // JWT Authentication
 builder.Services
@@ -60,7 +74,7 @@ builder.Services
             };
     });
 
-// Authorization
+// Permission authorization
 builder.Services.AddAuthorization();
 
 builder.Services.AddSingleton<
@@ -76,7 +90,7 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Migration ve başlangıç verileri
+// Migration ve başlangıç seed işlemleri
 await using (var scope =
              app.Services.CreateAsyncScope())
 {

@@ -19,6 +19,7 @@ public sealed class SaharutDbContext : DbContext
     public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -32,6 +33,7 @@ public sealed class SaharutDbContext : DbContext
         ConfigureOtpCode(modelBuilder);
         ConfigurePermission(modelBuilder);
         ConfigureRolePermission(modelBuilder);
+        ConfigureAuditLog(modelBuilder);
     }
 
     private static void ConfigureCompany(ModelBuilder modelBuilder)
@@ -226,7 +228,8 @@ public sealed class SaharutDbContext : DbContext
         });
     }
 
-    private static void ConfigureRolePermission(ModelBuilder modelBuilder)
+    private static void ConfigureRolePermission(
+        ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<RolePermission>(entity =>
         {
@@ -247,8 +250,65 @@ public sealed class SaharutDbContext : DbContext
 
             entity.HasOne(rolePermission => rolePermission.Permission)
                 .WithMany(permission => permission.RolePermissions)
-                .HasForeignKey(rolePermission => rolePermission.PermissionId)
+                .HasForeignKey(rolePermission =>
+                    rolePermission.PermissionId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureAuditLog(
+        ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("audit_logs");
+
+            entity.HasKey(auditLog => auditLog.Id);
+
+            entity.Property(auditLog => auditLog.EntityName)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(auditLog => auditLog.EntityId)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(auditLog => auditLog.Action)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(auditLog => auditLog.UserDisplayName)
+                .HasMaxLength(250);
+
+            entity.Property(auditLog => auditLog.HttpMethod)
+                .HasMaxLength(20);
+
+            entity.Property(auditLog => auditLog.RequestPath)
+                .HasMaxLength(500);
+
+            entity.Property(auditLog => auditLog.IpAddress)
+                .HasMaxLength(100);
+
+            entity.Property(auditLog => auditLog.OldValues)
+                .HasColumnType("jsonb");
+
+            entity.Property(auditLog => auditLog.NewValues)
+                .HasColumnType("jsonb");
+
+            entity.Property(auditLog => auditLog.ChangedColumns)
+                .HasColumnType("jsonb");
+
+            entity.HasIndex(auditLog => auditLog.CreatedAt);
+
+            entity.HasIndex(auditLog => auditLog.UserId);
+
+            entity.HasIndex(auditLog => new
+            {
+                auditLog.EntityName,
+                auditLog.EntityId
+            });
+
+            entity.HasIndex(auditLog => auditLog.Action);
         });
     }
 }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Saharut.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Saharut.Infrastructure.Persistence;
 namespace Saharut.Infrastructure.Migrations
 {
     [DbContext(typeof(SaharutDbContext))]
-    partial class SaharutDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260712074417_AddAuditLogs")]
+    partial class AddAuditLogs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
