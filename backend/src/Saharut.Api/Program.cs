@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Saharut.Api.Authorization;
+using Saharut.Api.Middleware;
 using Saharut.Infrastructure.Auditing;
 using Saharut.Infrastructure.Persistence;
 
@@ -26,13 +27,13 @@ var jwtSecretKey = builder.Configuration["Jwt:SecretKey"]
     ?? throw new InvalidOperationException(
         "JWT SecretKey bilgisi bulunamadı.");
 
-// HTTP request bilgilerine Infrastructure katmanından erişebilmek için
+// HTTP context
 builder.Services.AddHttpContextAccessor();
 
 // Audit interceptor
 builder.Services.AddScoped<AuditSaveChangesInterceptor>();
 
-// PostgreSQL ve audit interceptor bağlantısı
+// PostgreSQL ve audit interceptor
 builder.Services.AddDbContext<SaharutDbContext>(
     (serviceProvider, options) =>
     {
@@ -86,6 +87,7 @@ builder.Services.AddScoped<
     PermissionAuthorizationHandler>();
 
 builder.Services.AddControllers();
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -108,6 +110,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Bütün middleware'lerden önce merkezi hata yakalama
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();
