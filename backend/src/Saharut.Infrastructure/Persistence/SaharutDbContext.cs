@@ -17,6 +17,8 @@ public sealed class SaharutDbContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<CompanyUser> CompanyUsers => Set<CompanyUser>();
     public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +30,8 @@ public sealed class SaharutDbContext : DbContext
         ConfigureUserRole(modelBuilder);
         ConfigureCompanyUser(modelBuilder);
         ConfigureOtpCode(modelBuilder);
+        ConfigurePermission(modelBuilder);
+        ConfigureRolePermission(modelBuilder);
     }
 
     private static void ConfigureCompany(ModelBuilder modelBuilder)
@@ -189,6 +193,62 @@ public sealed class SaharutDbContext : DbContext
                 otpCode.IsUsed,
                 otpCode.ExpiresAt
             });
+        });
+    }
+
+    private static void ConfigurePermission(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Permission>(entity =>
+        {
+            entity.ToTable("permissions");
+
+            entity.HasKey(permission => permission.Id);
+
+            entity.Property(permission => permission.Name)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(permission => permission.Code)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(permission => permission.Module)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(permission => permission.Description)
+                .HasMaxLength(500);
+
+            entity.HasIndex(permission => permission.Code)
+                .IsUnique();
+
+            entity.HasIndex(permission => permission.Module);
+        });
+    }
+
+    private static void ConfigureRolePermission(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            entity.ToTable("role_permissions");
+
+            entity.HasKey(rolePermission => rolePermission.Id);
+
+            entity.HasIndex(rolePermission => new
+            {
+                rolePermission.RoleId,
+                rolePermission.PermissionId
+            }).IsUnique();
+
+            entity.HasOne(rolePermission => rolePermission.Role)
+                .WithMany(role => role.RolePermissions)
+                .HasForeignKey(rolePermission => rolePermission.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(rolePermission => rolePermission.Permission)
+                .WithMany(permission => permission.RolePermissions)
+                .HasForeignKey(rolePermission => rolePermission.PermissionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

@@ -1,7 +1,9 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Saharut.Api.Authorization;
 using Saharut.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,23 +11,19 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString =
     builder.Configuration.GetConnectionString("PostgreSql")
     ?? throw new InvalidOperationException(
-        "PostgreSQL bağlantı bilgisi bulunamadı."
-    );
+        "PostgreSQL bağlantı bilgisi bulunamadı.");
 
 var jwtIssuer = builder.Configuration["Jwt:Issuer"]
     ?? throw new InvalidOperationException(
-        "JWT Issuer bilgisi bulunamadı."
-    );
+        "JWT Issuer bilgisi bulunamadı.");
 
 var jwtAudience = builder.Configuration["Jwt:Audience"]
     ?? throw new InvalidOperationException(
-        "JWT Audience bilgisi bulunamadı."
-    );
+        "JWT Audience bilgisi bulunamadı.");
 
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"]
     ?? throw new InvalidOperationException(
-        "JWT SecretKey bilgisi bulunamadı."
-    );
+        "JWT SecretKey bilgisi bulunamadı.");
 
 // Veritabanı
 builder.Services.AddDbContext<SaharutDbContext>(options =>
@@ -56,14 +54,22 @@ builder.Services
 
                 IssuerSigningKey =
                     new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(jwtSecretKey)
-                    ),
+                        Encoding.UTF8.GetBytes(jwtSecretKey)),
 
                 ClockSkew = TimeSpan.Zero
             };
     });
 
+// Authorization
 builder.Services.AddAuthorization();
+
+builder.Services.AddSingleton<
+    IAuthorizationPolicyProvider,
+    PermissionAuthorizationPolicyProvider>();
+
+builder.Services.AddScoped<
+    IAuthorizationHandler,
+    PermissionAuthorizationHandler>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

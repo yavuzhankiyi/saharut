@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Saharut.Api.Contracts.Companies;
 using Saharut.Domain.Entities;
 using Saharut.Infrastructure.Persistence;
+using Saharut.Api.Authorization;
 
 namespace Saharut.Api.Controllers;
 
@@ -21,6 +22,7 @@ public sealed class CompaniesController : ControllerBase
 
     // GET: api/v1/companies
     [HttpGet]
+[HasPermission("COMPANIES.READ")]
     public async Task<IActionResult> GetAll(
         [FromQuery] CompanyQueryRequest request,
         CancellationToken cancellationToken)
@@ -132,6 +134,7 @@ public sealed class CompaniesController : ControllerBase
 
     // GET: api/v1/companies/{id}
     [HttpGet("{id:guid}")]
+[HasPermission("COMPANIES.READ")]
     public async Task<IActionResult> GetById(
         Guid id,
         CancellationToken cancellationToken)
@@ -195,6 +198,7 @@ public sealed class CompaniesController : ControllerBase
 
     // POST: api/v1/companies
     [HttpPost]
+[HasPermission("COMPANIES.CREATE")]
     public async Task<IActionResult> Create(
         [FromBody] CreateCompanyRequest request,
         CancellationToken cancellationToken)
@@ -264,6 +268,7 @@ public sealed class CompaniesController : ControllerBase
 
     // PUT: api/v1/companies/{id}
     [HttpPut("{id:guid}")]
+[HasPermission("COMPANIES.UPDATE")]
     public async Task<IActionResult> Update(
         Guid id,
         [FromBody] UpdateCompanyRequest request,
@@ -361,6 +366,7 @@ public sealed class CompaniesController : ControllerBase
 
     // PATCH: api/v1/companies/{id}/status
     [HttpPatch("{id:guid}/status")]
+[HasPermission("COMPANIES.UPDATE")]
     public async Task<IActionResult> SetStatus(
         Guid id,
         [FromBody] SetCompanyStatusRequest request,
@@ -420,6 +426,7 @@ public sealed class CompaniesController : ControllerBase
 
     // DELETE: api/v1/companies/{id}
     [HttpDelete("{id:guid}")]
+[HasPermission("COMPANIES.DELETE")]
     public async Task<IActionResult> Delete(
         Guid id,
         CancellationToken cancellationToken)
