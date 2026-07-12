@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Saharut.Api.Common.Pagination;
+using Saharut.Api.Common.Responses;
 using Saharut.Api.Contracts.Permissions;
 using Saharut.Domain.Entities;
 using Saharut.Infrastructure.Persistence;
@@ -14,7 +16,8 @@ public sealed class PermissionsController : ControllerBase
 {
     private readonly SaharutDbContext _dbContext;
 
-    public PermissionsController(SaharutDbContext dbContext)
+    public PermissionsController(
+        SaharutDbContext dbContext)
     {
         _dbContext = dbContext;
     }
@@ -25,46 +28,63 @@ public sealed class PermissionsController : ControllerBase
         [FromQuery] PermissionQueryRequest request,
         CancellationToken cancellationToken)
     {
-        var page = request.Page < 1
-            ? 1
-            : request.Page;
+        var page =
+            PaginationHelper.NormalizePage(
+                request.Page);
 
-        var pageSize = request.PageSize switch
-        {
-            < 1 => 20,
-            > 100 => 100,
-            _ => request.PageSize
-        };
+        var pageSize =
+            PaginationHelper.NormalizePageSize(
+                request.PageSize);
 
         var query = _dbContext.Permissions
             .AsNoTracking()
-            .Where(permission => !permission.IsDeleted);
+            .Where(permission =>
+                !permission.IsDeleted);
 
-        if (!string.IsNullOrWhiteSpace(request.Search))
+        if (!string.IsNullOrWhiteSpace(
+                request.Search))
         {
-            var search = request.Search.Trim();
+            var search =
+                request.Search.Trim();
 
             query = query.Where(permission =>
-                EF.Functions.ILike(permission.Name, $"%{search}%") ||
-                EF.Functions.ILike(permission.Code, $"%{search}%") ||
-                EF.Functions.ILike(permission.Module, $"%{search}%") ||
+                EF.Functions.ILike(
+                    permission.Name,
+                    $"%{search}%") ||
+
+                EF.Functions.ILike(
+                    permission.Code,
+                    $"%{search}%") ||
+
+                EF.Functions.ILike(
+                    permission.Module,
+                    $"%{search}%") ||
+
                 (permission.Description != null &&
-                 EF.Functions.ILike(permission.Description, $"%{search}%")));
+                 EF.Functions.ILike(
+                     permission.Description,
+                     $"%{search}%")));
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Module))
+        if (!string.IsNullOrWhiteSpace(
+                request.Module))
         {
-            var module = NormalizeModule(request.Module);
+            var module =
+                NormalizeModule(
+                    request.Module);
 
             query = query.Where(
-                permission => permission.Module == module);
+                permission =>
+                    permission.Module ==
+                    module);
         }
 
         if (request.IsActive.HasValue)
         {
             query = query.Where(
                 permission =>
-                    permission.IsActive == request.IsActive.Value);
+                    permission.IsActive ==
+                    request.IsActive.Value);
         }
 
         var descending = string.Equals(
@@ -72,34 +92,60 @@ public sealed class PermissionsController : ControllerBase
             "desc",
             StringComparison.OrdinalIgnoreCase);
 
-        query = request.SortBy.Trim().ToLowerInvariant() switch
+        query = request.SortBy
+            .Trim()
+            .ToLowerInvariant() switch
         {
             "code" => descending
-                ? query.OrderByDescending(permission => permission.Code)
-                : query.OrderBy(permission => permission.Code),
+                ? query.OrderByDescending(
+                    permission =>
+                        permission.Code)
+                : query.OrderBy(
+                    permission =>
+                        permission.Code),
 
             "module" => descending
-                ? query.OrderByDescending(permission => permission.Module)
-                : query.OrderBy(permission => permission.Module),
+                ? query.OrderByDescending(
+                    permission =>
+                        permission.Module)
+                : query.OrderBy(
+                    permission =>
+                        permission.Module),
 
             "createdat" => descending
-                ? query.OrderByDescending(permission => permission.CreatedAt)
-                : query.OrderBy(permission => permission.CreatedAt),
+                ? query.OrderByDescending(
+                    permission =>
+                        permission.CreatedAt)
+                : query.OrderBy(
+                    permission =>
+                        permission.CreatedAt),
 
             "isactive" => descending
-                ? query.OrderByDescending(permission => permission.IsActive)
-                : query.OrderBy(permission => permission.IsActive),
+                ? query.OrderByDescending(
+                    permission =>
+                        permission.IsActive)
+                : query.OrderBy(
+                    permission =>
+                        permission.IsActive),
 
             _ => descending
-                ? query.OrderByDescending(permission => permission.Name)
-                : query.OrderBy(permission => permission.Name)
+                ? query.OrderByDescending(
+                    permission =>
+                        permission.Name)
+                : query.OrderBy(
+                    permission =>
+                        permission.Name)
         };
 
         var totalCount =
-            await query.CountAsync(cancellationToken);
+            await query.CountAsync(
+                cancellationToken);
 
         var permissions = await query
-            .Skip((page - 1) * pageSize)
+            .Skip(
+                PaginationHelper.CalculateSkip(
+                    page,
+                    pageSize))
             .Take(pageSize)
             .Select(permission => new
             {
@@ -112,30 +158,21 @@ public sealed class PermissionsController : ControllerBase
                 permission.CreatedAt,
                 permission.UpdatedAt,
 
-                roleCount = permission.RolePermissions.Count(
-                    rolePermission =>
-                        !rolePermission.IsDeleted &&
-                        !rolePermission.Role.IsDeleted)
+                roleCount =
+                    permission.RolePermissions.Count(
+                        rolePermission =>
+                            !rolePermission.IsDeleted &&
+                            !rolePermission.Role.IsDeleted)
             })
-            .ToListAsync(cancellationToken);
+            .ToListAsync(
+                cancellationToken);
 
-        var totalPages = totalCount == 0
-            ? 0
-            : (int)Math.Ceiling(
-                totalCount / (double)pageSize);
-
-        return Ok(new
-        {
-            success = true,
-            data = permissions,
-            pagination = new
-            {
+        return Ok(
+            PagedResponse.Create(
+                permissions,
                 page,
                 pageSize,
-                totalCount,
-                totalPages
-            }
-        });
+                totalCount));
     }
 
     // GET: api/v1/permissions/{id}
@@ -144,37 +181,40 @@ public sealed class PermissionsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var permission = await _dbContext.Permissions
-            .AsNoTracking()
-            .Where(permission =>
-                permission.Id == id &&
-                !permission.IsDeleted)
-            .Select(permission => new
-            {
-                permission.Id,
-                permission.Name,
-                permission.Code,
-                permission.Module,
-                permission.Description,
-                permission.IsActive,
-                permission.CreatedAt,
-                permission.UpdatedAt,
+        var permission =
+            await _dbContext.Permissions
+                .AsNoTracking()
+                .Where(permission =>
+                    permission.Id == id &&
+                    !permission.IsDeleted)
+                .Select(permission => new
+                {
+                    permission.Id,
+                    permission.Name,
+                    permission.Code,
+                    permission.Module,
+                    permission.Description,
+                    permission.IsActive,
+                    permission.CreatedAt,
+                    permission.UpdatedAt,
 
-                roles = permission.RolePermissions
-                    .Where(rolePermission =>
-                        !rolePermission.IsDeleted &&
-                        !rolePermission.Role.IsDeleted)
-                    .OrderBy(rolePermission =>
-                        rolePermission.Role.Name)
-                    .Select(rolePermission => new
-                    {
-                        rolePermission.Role.Id,
-                        rolePermission.Role.Name,
-                        rolePermission.Role.Code,
-                        rolePermission.Role.IsActive
-                    })
-            })
-            .FirstOrDefaultAsync(cancellationToken);
+                    roles =
+                        permission.RolePermissions
+                            .Where(rolePermission =>
+                                !rolePermission.IsDeleted &&
+                                !rolePermission.Role.IsDeleted)
+                            .OrderBy(rolePermission =>
+                                rolePermission.Role.Name)
+                            .Select(rolePermission => new
+                            {
+                                rolePermission.Role.Id,
+                                rolePermission.Role.Name,
+                                rolePermission.Role.Code,
+                                rolePermission.Role.IsActive
+                            })
+                })
+                .FirstOrDefaultAsync(
+                    cancellationToken);
 
         if (permission is null)
         {
@@ -185,11 +225,9 @@ public sealed class PermissionsController : ControllerBase
             });
         }
 
-        return Ok(new
-        {
-            success = true,
-            data = permission
-        });
+        return Ok(
+            ApiResponse<object>.Ok(
+                permission));
     }
 
     // POST: api/v1/permissions
@@ -198,9 +236,12 @@ public sealed class PermissionsController : ControllerBase
         [FromBody] CreatePermissionRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name) ||
-            string.IsNullOrWhiteSpace(request.Code) ||
-            string.IsNullOrWhiteSpace(request.Module))
+        if (string.IsNullOrWhiteSpace(
+                request.Name) ||
+            string.IsNullOrWhiteSpace(
+                request.Code) ||
+            string.IsNullOrWhiteSpace(
+                request.Module))
         {
             return BadRequest(new
             {
@@ -211,12 +252,14 @@ public sealed class PermissionsController : ControllerBase
         }
 
         var normalizedCode =
-            NormalizeCode(request.Code);
+            NormalizeCode(
+                request.Code);
 
         var codeExists =
             await _dbContext.Permissions.AnyAsync(
                 permission =>
-                    permission.Code == normalizedCode &&
+                    permission.Code ==
+                    normalizedCode &&
                     !permission.IsDeleted,
                 cancellationToken);
 
@@ -225,42 +268,55 @@ public sealed class PermissionsController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Bu yetki kodu zaten kullanılıyor."
+                message =
+                    "Bu yetki kodu zaten kullanılıyor."
             });
         }
 
         var permission = new Permission
         {
-            Name = request.Name.Trim(),
-            Code = normalizedCode,
-            Module = NormalizeModule(request.Module),
+            Name =
+                request.Name.Trim(),
+
+            Code =
+                normalizedCode,
+
+            Module =
+                NormalizeModule(
+                    request.Module),
+
             Description =
-                NormalizeOptionalText(request.Description),
+                NormalizeOptionalText(
+                    request.Description),
+
             IsActive = true
         };
 
-        _dbContext.Permissions.Add(permission);
+        _dbContext.Permissions.Add(
+            permission);
 
         await _dbContext.SaveChangesAsync(
             cancellationToken);
 
+        var responseData = new
+        {
+            permission.Id,
+            permission.Name,
+            permission.Code,
+            permission.Module,
+            permission.Description,
+            permission.IsActive
+        };
+
         return CreatedAtAction(
             nameof(GetById),
-            new { id = permission.Id },
             new
             {
-                success = true,
-                message = "Yetki başarıyla oluşturuldu.",
-                data = new
-                {
-                    permission.Id,
-                    permission.Name,
-                    permission.Code,
-                    permission.Module,
-                    permission.Description,
-                    permission.IsActive
-                }
-            });
+                id = permission.Id
+            },
+            ApiResponse<object>.Created(
+                responseData,
+                "Yetki başarıyla oluşturuldu."));
     }
 
     // PUT: api/v1/permissions/{id}
@@ -270,9 +326,12 @@ public sealed class PermissionsController : ControllerBase
         [FromBody] UpdatePermissionRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name) ||
-            string.IsNullOrWhiteSpace(request.Code) ||
-            string.IsNullOrWhiteSpace(request.Module))
+        if (string.IsNullOrWhiteSpace(
+                request.Name) ||
+            string.IsNullOrWhiteSpace(
+                request.Code) ||
+            string.IsNullOrWhiteSpace(
+                request.Module))
         {
             return BadRequest(new
             {
@@ -300,13 +359,15 @@ public sealed class PermissionsController : ControllerBase
         }
 
         var normalizedCode =
-            NormalizeCode(request.Code);
+            NormalizeCode(
+                request.Code);
 
         var codeExists =
             await _dbContext.Permissions.AnyAsync(
                 otherPermission =>
                     otherPermission.Id != id &&
-                    otherPermission.Code == normalizedCode &&
+                    otherPermission.Code ==
+                    normalizedCode &&
                     !otherPermission.IsDeleted,
                 cancellationToken);
 
@@ -324,13 +385,14 @@ public sealed class PermissionsController : ControllerBase
             permission.IsActive)
         {
             var assignedToActiveRole =
-                await _dbContext.RolePermissions.AnyAsync(
-                    rolePermission =>
-                        rolePermission.PermissionId == id &&
-                        !rolePermission.IsDeleted &&
-                        !rolePermission.Role.IsDeleted &&
-                        rolePermission.Role.IsActive,
-                    cancellationToken);
+                await _dbContext.RolePermissions
+                    .AnyAsync(
+                        rolePermission =>
+                            rolePermission.PermissionId == id &&
+                            !rolePermission.IsDeleted &&
+                            !rolePermission.Role.IsDeleted &&
+                            rolePermission.Role.IsActive,
+                        cancellationToken);
 
             if (assignedToActiveRole)
             {
@@ -343,33 +405,44 @@ public sealed class PermissionsController : ControllerBase
             }
         }
 
-        permission.Name = request.Name.Trim();
-        permission.Code = normalizedCode;
+        permission.Name =
+            request.Name.Trim();
+
+        permission.Code =
+            normalizedCode;
+
         permission.Module =
-            NormalizeModule(request.Module);
+            NormalizeModule(
+                request.Module);
+
         permission.Description =
-            NormalizeOptionalText(request.Description);
-        permission.IsActive = request.IsActive;
-        permission.UpdatedAt = DateTime.UtcNow;
+            NormalizeOptionalText(
+                request.Description);
+
+        permission.IsActive =
+            request.IsActive;
+
+        permission.UpdatedAt =
+            DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(
             cancellationToken);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = "Yetki başarıyla güncellendi.",
-            data = new
-            {
-                permission.Id,
-                permission.Name,
-                permission.Code,
-                permission.Module,
-                permission.Description,
-                permission.IsActive,
-                permission.UpdatedAt
-            }
-        });
+            permission.Id,
+            permission.Name,
+            permission.Code,
+            permission.Module,
+            permission.Description,
+            permission.IsActive,
+            permission.UpdatedAt
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Yetki başarıyla güncellendi."));
     }
 
     // PATCH: api/v1/permissions/{id}/status
@@ -399,13 +472,14 @@ public sealed class PermissionsController : ControllerBase
         if (!request.IsActive)
         {
             var assignedToActiveRole =
-                await _dbContext.RolePermissions.AnyAsync(
-                    rolePermission =>
-                        rolePermission.PermissionId == id &&
-                        !rolePermission.IsDeleted &&
-                        !rolePermission.Role.IsDeleted &&
-                        rolePermission.Role.IsActive,
-                    cancellationToken);
+                await _dbContext.RolePermissions
+                    .AnyAsync(
+                        rolePermission =>
+                            rolePermission.PermissionId == id &&
+                            !rolePermission.IsDeleted &&
+                            !rolePermission.Role.IsDeleted &&
+                            rolePermission.Role.IsActive,
+                        cancellationToken);
 
             if (assignedToActiveRole)
             {
@@ -418,25 +492,30 @@ public sealed class PermissionsController : ControllerBase
             }
         }
 
-        permission.IsActive = request.IsActive;
-        permission.UpdatedAt = DateTime.UtcNow;
+        permission.IsActive =
+            request.IsActive;
+
+        permission.UpdatedAt =
+            DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(
             cancellationToken);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = request.IsActive
-                ? "Yetki aktif hâle getirildi."
-                : "Yetki pasif hâle getirildi.",
-            data = new
-            {
-                permission.Id,
-                permission.IsActive,
-                permission.UpdatedAt
-            }
-        });
+            permission.Id,
+            permission.IsActive,
+            permission.UpdatedAt
+        };
+
+        var message = request.IsActive
+            ? "Yetki aktif hâle getirildi."
+            : "Yetki pasif hâle getirildi.";
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                message));
     }
 
     // DELETE: api/v1/permissions/{id}
@@ -463,12 +542,13 @@ public sealed class PermissionsController : ControllerBase
         }
 
         var hasAssignedRoles =
-            await _dbContext.RolePermissions.AnyAsync(
-                rolePermission =>
-                    rolePermission.PermissionId == id &&
-                    !rolePermission.IsDeleted &&
-                    !rolePermission.Role.IsDeleted,
-                cancellationToken);
+            await _dbContext.RolePermissions
+                .AnyAsync(
+                    rolePermission =>
+                        rolePermission.PermissionId == id &&
+                        !rolePermission.IsDeleted &&
+                        !rolePermission.Role.IsDeleted,
+                    cancellationToken);
 
         if (hasAssignedRoles)
         {
@@ -482,20 +562,20 @@ public sealed class PermissionsController : ControllerBase
 
         permission.IsDeleted = true;
         permission.IsActive = false;
-        permission.UpdatedAt = DateTime.UtcNow;
+        permission.UpdatedAt =
+            DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(
             cancellationToken);
 
-        return Ok(new
-        {
-            success = true,
-            message = "Yetki başarıyla silindi."
-        });
+        return Ok(
+            MessageResponse.Ok(
+                "Yetki başarıyla silindi."));
     }
 
     // GET: api/v1/roles/{roleId}/permissions
-    [HttpGet("~/api/v1/roles/{roleId:guid}/permissions")]
+    [HttpGet(
+        "~/api/v1/roles/{roleId:guid}/permissions")]
     public async Task<IActionResult> GetRolePermissions(
         Guid roleId,
         CancellationToken cancellationToken)
@@ -512,24 +592,26 @@ public sealed class PermissionsController : ControllerBase
                 role.Code,
                 role.IsActive,
 
-                permissions = role.RolePermissions
-                    .Where(rolePermission =>
-                        !rolePermission.IsDeleted &&
-                        !rolePermission.Permission.IsDeleted)
-                    .OrderBy(rolePermission =>
-                        rolePermission.Permission.Module)
-                    .ThenBy(rolePermission =>
-                        rolePermission.Permission.Name)
-                    .Select(rolePermission => new
-                    {
-                        rolePermission.Permission.Id,
-                        rolePermission.Permission.Name,
-                        rolePermission.Permission.Code,
-                        rolePermission.Permission.Module,
-                        rolePermission.Permission.IsActive
-                    })
+                permissions =
+                    role.RolePermissions
+                        .Where(rolePermission =>
+                            !rolePermission.IsDeleted &&
+                            !rolePermission.Permission.IsDeleted)
+                        .OrderBy(rolePermission =>
+                            rolePermission.Permission.Module)
+                        .ThenBy(rolePermission =>
+                            rolePermission.Permission.Name)
+                        .Select(rolePermission => new
+                        {
+                            rolePermission.Permission.Id,
+                            rolePermission.Permission.Name,
+                            rolePermission.Permission.Code,
+                            rolePermission.Permission.Module,
+                            rolePermission.Permission.IsActive
+                        })
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(
+                cancellationToken);
 
         if (role is null)
         {
@@ -540,11 +622,9 @@ public sealed class PermissionsController : ControllerBase
             });
         }
 
-        return Ok(new
-        {
-            success = true,
-            data = role
-        });
+        return Ok(
+            ApiResponse<object>.Ok(
+                role));
     }
 
     // POST: api/v1/roles/{roleId}/permissions/{permissionId}
@@ -612,8 +692,10 @@ public sealed class PermissionsController : ControllerBase
             await _dbContext.RolePermissions
                 .FirstOrDefaultAsync(
                     rolePermission =>
-                        rolePermission.RoleId == roleId &&
-                        rolePermission.PermissionId == permissionId,
+                        rolePermission.RoleId ==
+                        roleId &&
+                        rolePermission.PermissionId ==
+                        permissionId,
                     cancellationToken);
 
         if (rolePermission is not null &&
@@ -629,13 +711,15 @@ public sealed class PermissionsController : ControllerBase
 
         if (rolePermission is null)
         {
-            rolePermission = new RolePermission
-            {
-                RoleId = roleId,
-                PermissionId = permissionId,
-                Role = role,
-                Permission = permission
-            };
+            rolePermission =
+                new RolePermission
+                {
+                    RoleId = roleId,
+                    PermissionId =
+                        permissionId,
+                    Role = role,
+                    Permission = permission
+                };
 
             _dbContext.RolePermissions.Add(
                 rolePermission);
@@ -643,28 +727,32 @@ public sealed class PermissionsController : ControllerBase
         else
         {
             rolePermission.IsDeleted = false;
-            rolePermission.UpdatedAt = DateTime.UtcNow;
+            rolePermission.UpdatedAt =
+                DateTime.UtcNow;
         }
 
         await _dbContext.SaveChangesAsync(
             cancellationToken);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = "Yetki role başarıyla atandı.",
-            data = new
-{
-    roleId = role.Id,
-    roleName = role.Name,
-    roleCode = role.Code,
+            roleId = role.Id,
+            roleName = role.Name,
+            roleCode = role.Code,
 
-    permissionId = permission.Id,
-    permissionName = permission.Name,
-    permissionCode = permission.Code,
-    permissionModule = permission.Module
-}
-        });
+            permissionId = permission.Id,
+            permissionName =
+                permission.Name,
+            permissionCode =
+                permission.Code,
+            permissionModule =
+                permission.Module
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Yetki role başarıyla atandı."));
     }
 
     // DELETE: api/v1/roles/{roleId}/permissions/{permissionId}
@@ -683,8 +771,10 @@ public sealed class PermissionsController : ControllerBase
                     rolePermission.Permission)
                 .FirstOrDefaultAsync(
                     rolePermission =>
-                        rolePermission.RoleId == roleId &&
-                        rolePermission.PermissionId == permissionId &&
+                        rolePermission.RoleId ==
+                        roleId &&
+                        rolePermission.PermissionId ==
+                        permissionId &&
                         !rolePermission.IsDeleted &&
                         !rolePermission.Role.IsDeleted &&
                         !rolePermission.Permission.IsDeleted,
@@ -701,20 +791,19 @@ public sealed class PermissionsController : ControllerBase
         }
 
         rolePermission.IsDeleted = true;
-        rolePermission.UpdatedAt = DateTime.UtcNow;
+        rolePermission.UpdatedAt =
+            DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(
             cancellationToken);
 
-        return Ok(new
-        {
-            success = true,
-            message =
-                "Yetki rol üzerinden başarıyla kaldırıldı."
-        });
+        return Ok(
+            MessageResponse.Ok(
+                "Yetki rol üzerinden başarıyla kaldırıldı."));
     }
 
-    private static string NormalizeCode(string value)
+    private static string NormalizeCode(
+        string value)
     {
         return value
             .Trim()
@@ -722,7 +811,8 @@ public sealed class PermissionsController : ControllerBase
             .ToUpperInvariant();
     }
 
-    private static string NormalizeModule(string value)
+    private static string NormalizeModule(
+        string value)
     {
         return value
             .Trim()
