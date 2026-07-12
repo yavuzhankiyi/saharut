@@ -203,14 +203,6 @@ public sealed class CompaniesController : ControllerBase
         [FromBody] CreateCompanyRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return BadRequest(new
-            {
-                success = false,
-                message = "Firma adı zorunludur."
-            });
-        }
 
         var normalizedTaxNumber =
             NormalizeOptionalText(request.TaxNumber);
@@ -274,14 +266,6 @@ public sealed class CompaniesController : ControllerBase
         [FromBody] UpdateCompanyRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-        {
-            return BadRequest(new
-            {
-                success = false,
-                message = "Firma adı zorunludur."
-            });
-        }
 
         var company = await _dbContext.Companies
             .FirstOrDefaultAsync(

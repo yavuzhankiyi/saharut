@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Saharut.Api.Authorization;
 using Saharut.Api.Middleware;
+using Saharut.Api.Validation;
 using Saharut.Infrastructure.Auditing;
 using Saharut.Infrastructure.Persistence;
 
@@ -27,13 +28,10 @@ var jwtSecretKey = builder.Configuration["Jwt:SecretKey"]
     ?? throw new InvalidOperationException(
         "JWT SecretKey bilgisi bulunamadı.");
 
-// HTTP context
 builder.Services.AddHttpContextAccessor();
 
-// Audit interceptor
 builder.Services.AddScoped<AuditSaveChangesInterceptor>();
 
-// PostgreSQL ve audit interceptor
 builder.Services.AddDbContext<SaharutDbContext>(
     (serviceProvider, options) =>
     {
@@ -44,7 +42,6 @@ builder.Services.AddDbContext<SaharutDbContext>(
                 AuditSaveChangesInterceptor>());
     });
 
-// JWT Authentication
 builder.Services
     .AddAuthentication(options =>
     {
@@ -75,7 +72,6 @@ builder.Services
             };
     });
 
-// Permission authorization
 builder.Services.AddAuthorization();
 
 builder.Services.AddSingleton<
@@ -86,13 +82,12 @@ builder.Services.AddScoped<
     IAuthorizationHandler,
     PermissionAuthorizationHandler>();
 
-builder.Services.AddControllers();
+builder.Services.AddApiValidation();
 
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Migration ve başlangıç seed işlemleri
 await using (var scope =
              app.Services.CreateAsyncScope())
 {
@@ -111,7 +106,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Bütün middleware'lerden önce merkezi hata yakalama
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.UseAuthentication();
