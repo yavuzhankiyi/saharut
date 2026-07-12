@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Saharut.Api.Authorization;
+using Saharut.Api.Common.Pagination;
+using Saharut.Api.Common.Responses;
 using Saharut.Api.Contracts.Roles;
 using Saharut.Domain.Entities;
 using Saharut.Infrastructure.Persistence;
@@ -26,7 +28,8 @@ public sealed class RolesController : ControllerBase
 
     private readonly SaharutDbContext _dbContext;
 
-    public RolesController(SaharutDbContext dbContext)
+    public RolesController(
+        SaharutDbContext dbContext)
     {
         _dbContext = dbContext;
     }
@@ -38,16 +41,13 @@ public sealed class RolesController : ControllerBase
         [FromQuery] RoleQueryRequest request,
         CancellationToken cancellationToken)
     {
-        var page = request.Page < 1
-            ? 1
-            : request.Page;
+        var page =
+            PaginationHelper.NormalizePage(
+                request.Page);
 
-        var pageSize = request.PageSize switch
-        {
-            < 1 => 20,
-            > 100 => 100,
-            _ => request.PageSize
-        };
+        var pageSize =
+            PaginationHelper.NormalizePageSize(
+                request.PageSize);
 
         var query = _dbContext.Roles
             .AsNoTracking()
@@ -58,16 +58,26 @@ public sealed class RolesController : ControllerBase
             var search = request.Search.Trim();
 
             query = query.Where(role =>
-                EF.Functions.ILike(role.Name, $"%{search}%") ||
-                EF.Functions.ILike(role.Code, $"%{search}%") ||
+                EF.Functions.ILike(
+                    role.Name,
+                    $"%{search}%") ||
+
+                EF.Functions.ILike(
+                    role.Code,
+                    $"%{search}%") ||
+
                 (role.Description != null &&
-                 EF.Functions.ILike(role.Description, $"%{search}%")));
+                 EF.Functions.ILike(
+                     role.Description,
+                     $"%{search}%")));
         }
 
         if (request.IsActive.HasValue)
         {
             query = query.Where(
-                role => role.IsActive == request.IsActive.Value);
+                role =>
+                    role.IsActive ==
+                    request.IsActive.Value);
         }
 
         var descending = string.Equals(
@@ -75,29 +85,44 @@ public sealed class RolesController : ControllerBase
             "desc",
             StringComparison.OrdinalIgnoreCase);
 
-        query = request.SortBy.Trim().ToLowerInvariant() switch
+        query = request.SortBy
+            .Trim()
+            .ToLowerInvariant() switch
         {
             "code" => descending
-                ? query.OrderByDescending(role => role.Code)
-                : query.OrderBy(role => role.Code),
+                ? query.OrderByDescending(
+                    role => role.Code)
+                : query.OrderBy(
+                    role => role.Code),
 
             "createdat" => descending
-                ? query.OrderByDescending(role => role.CreatedAt)
-                : query.OrderBy(role => role.CreatedAt),
+                ? query.OrderByDescending(
+                    role => role.CreatedAt)
+                : query.OrderBy(
+                    role => role.CreatedAt),
 
             "isactive" => descending
-                ? query.OrderByDescending(role => role.IsActive)
-                : query.OrderBy(role => role.IsActive),
+                ? query.OrderByDescending(
+                    role => role.IsActive)
+                : query.OrderBy(
+                    role => role.IsActive),
 
             _ => descending
-                ? query.OrderByDescending(role => role.Name)
-                : query.OrderBy(role => role.Name)
+                ? query.OrderByDescending(
+                    role => role.Name)
+                : query.OrderBy(
+                    role => role.Name)
         };
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        var totalCount =
+            await query.CountAsync(
+                cancellationToken);
 
         var roles = await query
-            .Skip((page - 1) * pageSize)
+            .Skip(
+                PaginationHelper.CalculateSkip(
+                    page,
+                    pageSize))
             .Take(pageSize)
             .Select(role => new
             {
@@ -108,28 +133,20 @@ public sealed class RolesController : ControllerBase
                 role.IsActive,
                 role.CreatedAt,
                 role.UpdatedAt,
-                userCount = role.UserRoles.Count(userRole =>
-                    !userRole.IsDeleted &&
-                    !userRole.User.IsDeleted)
+
+                userCount = role.UserRoles.Count(
+                    userRole =>
+                        !userRole.IsDeleted &&
+                        !userRole.User.IsDeleted)
             })
             .ToListAsync(cancellationToken);
 
-        var totalPages = totalCount == 0
-            ? 0
-            : (int)Math.Ceiling(totalCount / (double)pageSize);
-
-        return Ok(new
-        {
-            success = true,
-            data = roles,
-            pagination = new
-            {
+        return Ok(
+            PagedResponse.Create(
+                roles,
                 page,
                 pageSize,
-                totalCount,
-                totalPages
-            }
-        });
+                totalCount));
     }
 
     // GET: api/v1/roles/{id}
@@ -153,16 +170,20 @@ public sealed class RolesController : ControllerBase
                 role.IsActive,
                 role.CreatedAt,
                 role.UpdatedAt,
-                userCount = role.UserRoles.Count(userRole =>
-                    !userRole.IsDeleted &&
-                    !userRole.User.IsDeleted),
+
+                userCount = role.UserRoles.Count(
+                    userRole =>
+                        !userRole.IsDeleted &&
+                        !userRole.User.IsDeleted),
 
                 users = role.UserRoles
                     .Where(userRole =>
                         !userRole.IsDeleted &&
                         !userRole.User.IsDeleted)
-                    .OrderBy(userRole => userRole.User.FirstName)
-                    .ThenBy(userRole => userRole.User.LastName)
+                    .OrderBy(userRole =>
+                        userRole.User.FirstName)
+                    .ThenBy(userRole =>
+                        userRole.User.LastName)
                     .Select(userRole => new
                     {
                         userRole.User.Id,
@@ -172,22 +193,21 @@ public sealed class RolesController : ControllerBase
                         userRole.User.IsActive
                     })
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(
+                cancellationToken);
 
         if (role is null)
         {
             return NotFound(new
             {
                 success = false,
-                message = "Rol bulunamadÄ±."
+                message = "Rol bulunamadı."
             });
         }
 
-        return Ok(new
-        {
-            success = true,
-            data = role
-        });
+        return Ok(
+            ApiResponse<object>.Ok(
+                role));
     }
 
     // POST: api/v1/roles
@@ -203,24 +223,28 @@ public sealed class RolesController : ControllerBase
             return BadRequest(new
             {
                 success = false,
-                message = "Rol adÄ± ve rol kodu zorunludur."
+                message =
+                    "Rol adı ve rol kodu zorunludur."
             });
         }
 
-        var normalizedCode = NormalizeCode(request.Code);
+        var normalizedCode =
+            NormalizeCode(request.Code);
 
-        var codeExists = await _dbContext.Roles.AnyAsync(
-            role =>
-                role.Code == normalizedCode &&
-                !role.IsDeleted,
-            cancellationToken);
+        var codeExists =
+            await _dbContext.Roles.AnyAsync(
+                role =>
+                    role.Code == normalizedCode &&
+                    !role.IsDeleted,
+                cancellationToken);
 
         if (codeExists)
         {
             return Conflict(new
             {
                 success = false,
-                message = "Bu rol kodu zaten kullanÄ±lÄ±yor."
+                message =
+                    "Bu rol kodu zaten kullanılıyor."
             });
         }
 
@@ -228,29 +252,35 @@ public sealed class RolesController : ControllerBase
         {
             Name = request.Name.Trim(),
             Code = normalizedCode,
-            Description = NormalizeOptionalText(request.Description),
+            Description =
+                NormalizeOptionalText(
+                    request.Description),
             IsActive = true
         };
 
         _dbContext.Roles.Add(role);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        var responseData = new
+        {
+            role.Id,
+            role.Name,
+            role.Code,
+            role.Description,
+            role.IsActive
+        };
 
         return CreatedAtAction(
             nameof(GetById),
-            new { id = role.Id },
             new
             {
-                success = true,
-                message = "Rol baÅŸarÄ±yla oluÅŸturuldu.",
-                data = new
-                {
-                    role.Id,
-                    role.Name,
-                    role.Code,
-                    role.Description,
-                    role.IsActive
-                }
-            });
+                id = role.Id
+            },
+            ApiResponse<object>.Created(
+                responseData,
+                "Rol başarıyla oluşturuldu."));
     }
 
     // PUT: api/v1/roles/{id}
@@ -267,7 +297,8 @@ public sealed class RolesController : ControllerBase
             return BadRequest(new
             {
                 success = false,
-                message = "Rol adÄ± ve rol kodu zorunludur."
+                message =
+                    "Rol adı ve rol kodu zorunludur."
             });
         }
 
@@ -283,11 +314,12 @@ public sealed class RolesController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Rol bulunamadÄ±."
+                message = "Rol bulunamadı."
             });
         }
 
-        var normalizedCode = NormalizeCode(request.Code);
+        var normalizedCode =
+            NormalizeCode(request.Code);
 
         if (ProtectedRoleCodes.Contains(role.Code) &&
             !string.Equals(
@@ -298,23 +330,27 @@ public sealed class RolesController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Sistem rollerinin kodu deÄŸiÅŸtirilemez."
+                message =
+                    "Sistem rollerinin kodu değiştirilemez."
             });
         }
 
-        var codeExists = await _dbContext.Roles.AnyAsync(
-            otherRole =>
-                otherRole.Id != id &&
-                otherRole.Code == normalizedCode &&
-                !otherRole.IsDeleted,
-            cancellationToken);
+        var codeExists =
+            await _dbContext.Roles.AnyAsync(
+                otherRole =>
+                    otherRole.Id != id &&
+                    otherRole.Code ==
+                    normalizedCode &&
+                    !otherRole.IsDeleted,
+                cancellationToken);
 
         if (codeExists)
         {
             return Conflict(new
             {
                 success = false,
-                message = "Bu rol kodu baÅŸka bir rol tarafÄ±ndan kullanÄ±lÄ±yor."
+                message =
+                    "Bu rol kodu başka bir rol tarafından kullanılıyor."
             });
         }
 
@@ -325,32 +361,44 @@ public sealed class RolesController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Sistem rolleri pasif yapÄ±lamaz."
+                message =
+                    "Sistem rolleri pasif yapılamaz."
             });
         }
 
-        role.Name = request.Name.Trim();
-        role.Code = normalizedCode;
-        role.Description = NormalizeOptionalText(request.Description);
-        role.IsActive = request.IsActive;
-        role.UpdatedAt = DateTime.UtcNow;
+        role.Name =
+            request.Name.Trim();
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        role.Code =
+            normalizedCode;
 
-        return Ok(new
+        role.Description =
+            NormalizeOptionalText(
+                request.Description);
+
+        role.IsActive =
+            request.IsActive;
+
+        role.UpdatedAt =
+            DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        var responseData = new
         {
-            success = true,
-            message = "Rol baÅŸarÄ±yla gÃ¼ncellendi.",
-            data = new
-            {
-                role.Id,
-                role.Name,
-                role.Code,
-                role.Description,
-                role.IsActive,
-                role.UpdatedAt
-            }
-        });
+            role.Id,
+            role.Name,
+            role.Code,
+            role.Description,
+            role.IsActive,
+            role.UpdatedAt
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Rol başarıyla güncellendi."));
     }
 
     // PATCH: api/v1/roles/{id}/status
@@ -373,7 +421,7 @@ public sealed class RolesController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Rol bulunamadÄ±."
+                message = "Rol bulunamadı."
             });
         }
 
@@ -383,48 +431,57 @@ public sealed class RolesController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Sistem rolleri pasif yapÄ±lamaz."
+                message =
+                    "Sistem rolleri pasif yapılamaz."
             });
         }
 
         if (!request.IsActive)
         {
-            var hasActiveUsers = await _dbContext.UserRoles.AnyAsync(
-                userRole =>
-                    userRole.RoleId == id &&
-                    !userRole.IsDeleted &&
-                    !userRole.User.IsDeleted &&
-                    userRole.User.IsActive,
-                cancellationToken);
+            var hasActiveUsers =
+                await _dbContext.UserRoles.AnyAsync(
+                    userRole =>
+                        userRole.RoleId == id &&
+                        !userRole.IsDeleted &&
+                        !userRole.User.IsDeleted &&
+                        userRole.User.IsActive,
+                    cancellationToken);
 
             if (hasActiveUsers)
             {
                 return Conflict(new
                 {
                     success = false,
-                    message = "Aktif kullanÄ±cÄ±lara atanmÄ±ÅŸ rol pasif yapÄ±lamaz."
+                    message =
+                        "Aktif kullanıcılara atanmış rol pasif yapılamaz."
                 });
             }
         }
 
-        role.IsActive = request.IsActive;
-        role.UpdatedAt = DateTime.UtcNow;
+        role.IsActive =
+            request.IsActive;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        role.UpdatedAt =
+            DateTime.UtcNow;
 
-        return Ok(new
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        var responseData = new
         {
-            success = true,
-            message = request.IsActive
-                ? "Rol aktif hÃ¢le getirildi."
-                : "Rol pasif hÃ¢le getirildi.",
-            data = new
-            {
-                role.Id,
-                role.IsActive,
-                role.UpdatedAt
-            }
-        });
+            role.Id,
+            role.IsActive,
+            role.UpdatedAt
+        };
+
+        var message = request.IsActive
+            ? "Rol aktif hâle getirildi."
+            : "Rol pasif hâle getirildi.";
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                message));
     }
 
     // DELETE: api/v1/roles/{id}
@@ -446,7 +503,7 @@ public sealed class RolesController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Rol bulunamadÄ±."
+                message = "Rol bulunamadı."
             });
         }
 
@@ -455,23 +512,26 @@ public sealed class RolesController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Sistem rolleri silinemez."
+                message =
+                    "Sistem rolleri silinemez."
             });
         }
 
-        var hasAssignedUsers = await _dbContext.UserRoles.AnyAsync(
-            userRole =>
-                userRole.RoleId == id &&
-                !userRole.IsDeleted &&
-                !userRole.User.IsDeleted,
-            cancellationToken);
+        var hasAssignedUsers =
+            await _dbContext.UserRoles.AnyAsync(
+                userRole =>
+                    userRole.RoleId == id &&
+                    !userRole.IsDeleted &&
+                    !userRole.User.IsDeleted,
+                cancellationToken);
 
         if (hasAssignedUsers)
         {
             return Conflict(new
             {
                 success = false,
-                message = "KullanÄ±cÄ±lara atanmÄ±ÅŸ rol silinemez."
+                message =
+                    "Kullanıcılara atanmış rol silinemez."
             });
         }
 
@@ -479,16 +539,16 @@ public sealed class RolesController : ControllerBase
         role.IsActive = false;
         role.UpdatedAt = DateTime.UtcNow;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
-        return Ok(new
-        {
-            success = true,
-            message = "Rol baÅŸarÄ±yla silindi."
-        });
+        return Ok(
+            MessageResponse.Ok(
+                "Rol başarıyla silindi."));
     }
 
-    private static string NormalizeCode(string code)
+    private static string NormalizeCode(
+        string code)
     {
         return code
             .Trim()
@@ -496,7 +556,8 @@ public sealed class RolesController : ControllerBase
             .ToUpperInvariant();
     }
 
-    private static string? NormalizeOptionalText(string? value)
+    private static string? NormalizeOptionalText(
+        string? value)
     {
         return string.IsNullOrWhiteSpace(value)
             ? null
