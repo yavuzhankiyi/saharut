@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Saharut.Api.Authorization;
+using Saharut.Api.Common.Pagination;
+using Saharut.Api.Common.Responses;
 using Saharut.Api.Contracts.Users;
 using Saharut.Domain.Entities;
 using Saharut.Infrastructure.Persistence;
@@ -18,7 +20,8 @@ public sealed class UsersController : ControllerBase
 
     private readonly SaharutDbContext _dbContext;
 
-    public UsersController(SaharutDbContext dbContext)
+    public UsersController(
+        SaharutDbContext dbContext)
     {
         _dbContext = dbContext;
     }
@@ -30,16 +33,13 @@ public sealed class UsersController : ControllerBase
         [FromQuery] UserQueryRequest request,
         CancellationToken cancellationToken)
     {
-        var page = request.Page < 1
-            ? 1
-            : request.Page;
+        var page =
+            PaginationHelper.NormalizePage(
+                request.Page);
 
-        var pageSize = request.PageSize switch
-        {
-            < 1 => 20,
-            > 100 => 100,
-            _ => request.PageSize
-        };
+        var pageSize =
+            PaginationHelper.NormalizePageSize(
+                request.PageSize);
 
         var query = _dbContext.Users
             .AsNoTracking()
@@ -50,24 +50,38 @@ public sealed class UsersController : ControllerBase
             var search = request.Search.Trim();
 
             query = query.Where(user =>
-                EF.Functions.ILike(user.FirstName, $"%{search}%") ||
-                EF.Functions.ILike(user.LastName, $"%{search}%") ||
-                EF.Functions.ILike(user.PhoneNumber, $"%{search}%") ||
+                EF.Functions.ILike(
+                    user.FirstName,
+                    $"%{search}%") ||
+
+                EF.Functions.ILike(
+                    user.LastName,
+                    $"%{search}%") ||
+
+                EF.Functions.ILike(
+                    user.PhoneNumber,
+                    $"%{search}%") ||
+
                 (user.Email != null &&
-                 EF.Functions.ILike(user.Email, $"%{search}%")));
+                 EF.Functions.ILike(
+                     user.Email,
+                     $"%{search}%")));
         }
 
         if (request.IsActive.HasValue)
         {
             query = query.Where(
-                user => user.IsActive == request.IsActive.Value);
+                user =>
+                    user.IsActive ==
+                    request.IsActive.Value);
         }
 
         if (request.CompanyId.HasValue)
         {
             query = query.Where(user =>
                 user.CompanyUsers.Any(companyUser =>
-                    companyUser.CompanyId == request.CompanyId.Value &&
+                    companyUser.CompanyId ==
+                    request.CompanyId.Value &&
                     !companyUser.IsDeleted &&
                     companyUser.IsActive &&
                     !companyUser.Company.IsDeleted));
@@ -77,7 +91,8 @@ public sealed class UsersController : ControllerBase
         {
             query = query.Where(user =>
                 user.UserRoles.Any(userRole =>
-                    userRole.RoleId == request.RoleId.Value &&
+                    userRole.RoleId ==
+                    request.RoleId.Value &&
                     !userRole.IsDeleted &&
                     !userRole.Role.IsDeleted));
         }
@@ -87,37 +102,56 @@ public sealed class UsersController : ControllerBase
             "desc",
             StringComparison.OrdinalIgnoreCase);
 
-        query = request.SortBy.Trim().ToLowerInvariant() switch
+        query = request.SortBy
+            .Trim()
+            .ToLowerInvariant() switch
         {
             "lastname" => descending
-                ? query.OrderByDescending(user => user.LastName)
-                : query.OrderBy(user => user.LastName),
+                ? query.OrderByDescending(
+                    user => user.LastName)
+                : query.OrderBy(
+                    user => user.LastName),
 
             "phone" or "phonenumber" => descending
-                ? query.OrderByDescending(user => user.PhoneNumber)
-                : query.OrderBy(user => user.PhoneNumber),
+                ? query.OrderByDescending(
+                    user => user.PhoneNumber)
+                : query.OrderBy(
+                    user => user.PhoneNumber),
 
             "email" => descending
-                ? query.OrderByDescending(user => user.Email)
-                : query.OrderBy(user => user.Email),
+                ? query.OrderByDescending(
+                    user => user.Email)
+                : query.OrderBy(
+                    user => user.Email),
 
             "createdat" => descending
-                ? query.OrderByDescending(user => user.CreatedAt)
-                : query.OrderBy(user => user.CreatedAt),
+                ? query.OrderByDescending(
+                    user => user.CreatedAt)
+                : query.OrderBy(
+                    user => user.CreatedAt),
 
             "isactive" => descending
-                ? query.OrderByDescending(user => user.IsActive)
-                : query.OrderBy(user => user.IsActive),
+                ? query.OrderByDescending(
+                    user => user.IsActive)
+                : query.OrderBy(
+                    user => user.IsActive),
 
             _ => descending
-                ? query.OrderByDescending(user => user.FirstName)
-                : query.OrderBy(user => user.FirstName)
+                ? query.OrderByDescending(
+                    user => user.FirstName)
+                : query.OrderBy(
+                    user => user.FirstName)
         };
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        var totalCount =
+            await query.CountAsync(
+                cancellationToken);
 
         var users = await query
-            .Skip((page - 1) * pageSize)
+            .Skip(
+                PaginationHelper.CalculateSkip(
+                    page,
+                    pageSize))
             .Take(pageSize)
             .Select(user => new
             {
@@ -137,7 +171,8 @@ public sealed class UsersController : ControllerBase
                         !userRole.IsDeleted &&
                         !userRole.Role.IsDeleted &&
                         userRole.Role.IsActive)
-                    .OrderBy(userRole => userRole.Role.Name)
+                    .OrderBy(userRole =>
+                        userRole.Role.Name)
                     .Select(userRole => new
                     {
                         userRole.Role.Id,
@@ -151,7 +186,8 @@ public sealed class UsersController : ControllerBase
                         companyUser.IsActive &&
                         !companyUser.Company.IsDeleted &&
                         companyUser.Company.IsActive)
-                    .OrderBy(companyUser => companyUser.Company.Name)
+                    .OrderBy(companyUser =>
+                        companyUser.Company.Name)
                     .Select(companyUser => new
                     {
                         companyUser.Company.Id,
@@ -160,22 +196,12 @@ public sealed class UsersController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
-        var totalPages = totalCount == 0
-            ? 0
-            : (int)Math.Ceiling(totalCount / (double)pageSize);
-
-        return Ok(new
-        {
-            success = true,
-            data = users,
-            pagination = new
-            {
+        return Ok(
+            PagedResponse.Create(
+                users,
                 page,
                 pageSize,
-                totalCount,
-                totalPages
-            }
-        });
+                totalCount));
     }
 
     // GET: api/v1/users/{id}
@@ -207,7 +233,8 @@ public sealed class UsersController : ControllerBase
                     .Where(userRole =>
                         !userRole.IsDeleted &&
                         !userRole.Role.IsDeleted)
-                    .OrderBy(userRole => userRole.Role.Name)
+                    .OrderBy(userRole =>
+                        userRole.Role.Name)
                     .Select(userRole => new
                     {
                         userRole.Role.Id,
@@ -221,7 +248,8 @@ public sealed class UsersController : ControllerBase
                         !companyUser.IsDeleted &&
                         companyUser.IsActive &&
                         !companyUser.Company.IsDeleted)
-                    .OrderBy(companyUser => companyUser.Company.Name)
+                    .OrderBy(companyUser =>
+                        companyUser.Company.Name)
                     .Select(companyUser => new
                     {
                         companyUser.Company.Id,
@@ -229,22 +257,21 @@ public sealed class UsersController : ControllerBase
                         companyUser.Company.IsActive
                     })
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(
+                cancellationToken);
 
         if (user is null)
         {
             return NotFound(new
             {
                 success = false,
-                message = "KullanÄ±cÄ± bulunamadÄ±."
+                message = "Kullanıcı bulunamadı."
             });
         }
 
-        return Ok(new
-        {
-            success = true,
-            data = user
-        });
+        return Ok(
+            ApiResponse<object>.Ok(
+                user));
     }
 
     // POST: api/v1/users
@@ -254,31 +281,39 @@ public sealed class UsersController : ControllerBase
         [FromBody] CreateUserRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.FirstName) ||
-            string.IsNullOrWhiteSpace(request.LastName) ||
-            string.IsNullOrWhiteSpace(request.PhoneNumber))
+        if (string.IsNullOrWhiteSpace(
+                request.FirstName) ||
+            string.IsNullOrWhiteSpace(
+                request.LastName) ||
+            string.IsNullOrWhiteSpace(
+                request.PhoneNumber))
         {
             return BadRequest(new
             {
                 success = false,
-                message = "Ad, soyad ve telefon numarasÄ± zorunludur."
+                message =
+                    "Ad, soyad ve telefon numarası zorunludur."
             });
         }
 
-        var normalizedPhoneNumber = request.PhoneNumber.Trim();
+        var normalizedPhoneNumber =
+            request.PhoneNumber.Trim();
 
-        var phoneExists = await _dbContext.Users.AnyAsync(
-            user =>
-                user.PhoneNumber == normalizedPhoneNumber &&
-                !user.IsDeleted,
-            cancellationToken);
+        var phoneExists =
+            await _dbContext.Users.AnyAsync(
+                user =>
+                    user.PhoneNumber ==
+                    normalizedPhoneNumber &&
+                    !user.IsDeleted,
+                cancellationToken);
 
         if (phoneExists)
         {
             return Conflict(new
             {
                 success = false,
-                message = "Bu telefon numarasÄ± zaten kullanÄ±lÄ±yor."
+                message =
+                    "Bu telefon numarası zaten kullanılıyor."
             });
         }
 
@@ -289,7 +324,8 @@ public sealed class UsersController : ControllerBase
             company = await _dbContext.Companies
                 .FirstOrDefaultAsync(
                     company =>
-                        company.Id == request.CompanyId.Value &&
+                        company.Id ==
+                        request.CompanyId.Value &&
                         !company.IsDeleted &&
                         company.IsActive,
                     cancellationToken);
@@ -299,7 +335,8 @@ public sealed class UsersController : ControllerBase
                 return BadRequest(new
                 {
                     success = false,
-                    message = "SeÃ§ilen firma bulunamadÄ± veya aktif deÄŸil."
+                    message =
+                        "Seçilen firma bulunamadı veya aktif değil."
                 });
             }
         }
@@ -311,7 +348,8 @@ public sealed class UsersController : ControllerBase
             role = await _dbContext.Roles
                 .FirstOrDefaultAsync(
                     role =>
-                        role.Id == request.RoleId.Value &&
+                        role.Id ==
+                        request.RoleId.Value &&
                         !role.IsDeleted &&
                         role.IsActive,
                     cancellationToken);
@@ -321,77 +359,99 @@ public sealed class UsersController : ControllerBase
                 return BadRequest(new
                 {
                     success = false,
-                    message = "SeÃ§ilen rol bulunamadÄ± veya aktif deÄŸil."
+                    message =
+                        "Seçilen rol bulunamadı veya aktif değil."
                 });
             }
         }
 
         await using var transaction =
-            await _dbContext.Database.BeginTransactionAsync(
-                cancellationToken);
+            await _dbContext.Database
+                .BeginTransactionAsync(
+                    cancellationToken);
 
         try
         {
             var user = new User
             {
-                FirstName = request.FirstName.Trim(),
-                LastName = request.LastName.Trim(),
-                PhoneNumber = normalizedPhoneNumber,
-                Email = NormalizeOptionalText(request.Email),
+                FirstName =
+                    request.FirstName.Trim(),
+
+                LastName =
+                    request.LastName.Trim(),
+
+                PhoneNumber =
+                    normalizedPhoneNumber,
+
+                Email =
+                    NormalizeOptionalText(
+                        request.Email),
+
                 PhoneNumberConfirmed = false,
                 IsActive = true
             };
 
             _dbContext.Users.Add(user);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _dbContext.SaveChangesAsync(
+                cancellationToken);
 
             if (company is not null)
             {
-                _dbContext.CompanyUsers.Add(new CompanyUser
-                {
-                    UserId = user.Id,
-                    CompanyId = company.Id,
-                    IsActive = true
-                });
+                _dbContext.CompanyUsers.Add(
+                    new CompanyUser
+                    {
+                        UserId = user.Id,
+                        CompanyId = company.Id,
+                        IsActive = true
+                    });
             }
 
             if (role is not null)
             {
-                _dbContext.UserRoles.Add(new UserRole
-                {
-                    UserId = user.Id,
-                    RoleId = role.Id
-                });
+                _dbContext.UserRoles.Add(
+                    new UserRole
+                    {
+                        UserId = user.Id,
+                        RoleId = role.Id
+                    });
             }
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(
+                cancellationToken);
+
+            await transaction.CommitAsync(
+                cancellationToken);
+
+            var responseData = new
+            {
+                user.Id,
+                user.FirstName,
+                user.LastName,
+                user.PhoneNumber,
+                user.Email,
+                user.IsActive,
+                companyId = company?.Id,
+                companyName = company?.Name,
+                roleId = role?.Id,
+                roleName = role?.Name
+            };
 
             return CreatedAtAction(
                 nameof(GetById),
-                new { id = user.Id },
                 new
                 {
-                    success = true,
-                    message = "KullanÄ±cÄ± baÅŸarÄ±yla oluÅŸturuldu.",
-                    data = new
-                    {
-                        user.Id,
-                        user.FirstName,
-                        user.LastName,
-                        user.PhoneNumber,
-                        user.Email,
-                        user.IsActive,
-                        companyId = company?.Id,
-                        companyName = company?.Name,
-                        roleId = role?.Id,
-                        roleName = role?.Name
-                    }
-                });
+                    id = user.Id
+                },
+                ApiResponse<object>.Created(
+                    responseData,
+                    "Kullanıcı başarıyla oluşturuldu."));
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            await transaction.RollbackAsync(
+                cancellationToken);
+
             throw;
         }
     }
@@ -404,14 +464,18 @@ public sealed class UsersController : ControllerBase
         [FromBody] UpdateUserRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.FirstName) ||
-            string.IsNullOrWhiteSpace(request.LastName) ||
-            string.IsNullOrWhiteSpace(request.PhoneNumber))
+        if (string.IsNullOrWhiteSpace(
+                request.FirstName) ||
+            string.IsNullOrWhiteSpace(
+                request.LastName) ||
+            string.IsNullOrWhiteSpace(
+                request.PhoneNumber))
         {
             return BadRequest(new
             {
                 success = false,
-                message = "Ad, soyad ve telefon numarasÄ± zorunludur."
+                message =
+                    "Ad, soyad ve telefon numarası zorunludur."
             });
         }
 
@@ -427,16 +491,17 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "KullanÄ±cÄ± bulunamadÄ±."
+                message = "Kullanıcı bulunamadı."
             });
         }
 
-        if (!request.IsActive && user.IsActive)
+        if (!request.IsActive &&
+            user.IsActive)
         {
             var protectionResult =
                 await CheckSuperAdminProtectionAsync(
                     id,
-                    "Son aktif SUPER_ADMIN kullanÄ±cÄ±sÄ± pasif yapÄ±lamaz.",
+                    "Son aktif SUPER_ADMIN kullanıcısı pasif yapılamaz.",
                     cancellationToken);
 
             if (protectionResult is not null)
@@ -445,13 +510,15 @@ public sealed class UsersController : ControllerBase
             }
         }
 
-        var normalizedPhoneNumber = request.PhoneNumber.Trim();
+        var normalizedPhoneNumber =
+            request.PhoneNumber.Trim();
 
-        var phoneNumberExists = await _dbContext.Users
-            .AnyAsync(
+        var phoneNumberExists =
+            await _dbContext.Users.AnyAsync(
                 otherUser =>
                     otherUser.Id != id &&
-                    otherUser.PhoneNumber == normalizedPhoneNumber &&
+                    otherUser.PhoneNumber ==
+                    normalizedPhoneNumber &&
                     !otherUser.IsDeleted,
                 cancellationToken);
 
@@ -460,20 +527,36 @@ public sealed class UsersController : ControllerBase
             return Conflict(new
             {
                 success = false,
-                message = "Bu telefon numarasÄ± baÅŸka bir kullanÄ±cÄ± tarafÄ±ndan kullanÄ±lÄ±yor."
+                message =
+                    "Bu telefon numarası başka bir kullanıcı tarafından kullanılıyor."
             });
         }
 
-        var oldPhoneNumber = user.PhoneNumber;
-        var phoneNumberChanged =
-            oldPhoneNumber != normalizedPhoneNumber;
+        var oldPhoneNumber =
+            user.PhoneNumber;
 
-        user.FirstName = request.FirstName.Trim();
-        user.LastName = request.LastName.Trim();
-        user.PhoneNumber = normalizedPhoneNumber;
-        user.Email = NormalizeOptionalText(request.Email);
-        user.IsActive = request.IsActive;
-        user.UpdatedAt = DateTime.UtcNow;
+        var phoneNumberChanged =
+            oldPhoneNumber !=
+            normalizedPhoneNumber;
+
+        user.FirstName =
+            request.FirstName.Trim();
+
+        user.LastName =
+            request.LastName.Trim();
+
+        user.PhoneNumber =
+            normalizedPhoneNumber;
+
+        user.Email =
+            NormalizeOptionalText(
+                request.Email);
+
+        user.IsActive =
+            request.IsActive;
+
+        user.UpdatedAt =
+            DateTime.UtcNow;
 
         if (phoneNumberChanged)
         {
@@ -485,24 +568,25 @@ public sealed class UsersController : ControllerBase
                 cancellationToken);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = "KullanÄ±cÄ± baÅŸarÄ±yla gÃ¼ncellendi.",
-            data = new
-            {
-                user.Id,
-                user.FirstName,
-                user.LastName,
-                user.PhoneNumber,
-                user.Email,
-                user.PhoneNumberConfirmed,
-                user.IsActive,
-                user.UpdatedAt
-            }
-        });
+            user.Id,
+            user.FirstName,
+            user.LastName,
+            user.PhoneNumber,
+            user.Email,
+            user.PhoneNumberConfirmed,
+            user.IsActive,
+            user.UpdatedAt
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Kullanıcı başarıyla güncellendi."));
     }
 
     // PATCH: api/v1/users/{id}/status
@@ -525,27 +609,30 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "KullanÄ±cÄ± bulunamadÄ±."
+                message = "Kullanıcı bulunamadı."
             });
         }
 
-        if (!request.IsActive && user.IsActive)
+        if (!request.IsActive &&
+            user.IsActive)
         {
-            var currentUserId = GetCurrentUserId();
+            var currentUserId =
+                GetCurrentUserId();
 
             if (currentUserId == id)
             {
                 return Conflict(new
                 {
                     success = false,
-                    message = "Kendi kullanÄ±cÄ± hesabÄ±nÄ±zÄ± pasif yapamazsÄ±nÄ±z."
+                    message =
+                        "Kendi kullanıcı hesabınızı pasif yapamazsınız."
                 });
             }
 
             var protectionResult =
                 await CheckSuperAdminProtectionAsync(
                     id,
-                    "Son aktif SUPER_ADMIN kullanÄ±cÄ±sÄ± pasif yapÄ±lamaz.",
+                    "Son aktif SUPER_ADMIN kullanıcısı pasif yapılamaz.",
                     cancellationToken);
 
             if (protectionResult is not null)
@@ -554,8 +641,11 @@ public sealed class UsersController : ControllerBase
             }
         }
 
-        user.IsActive = request.IsActive;
-        user.UpdatedAt = DateTime.UtcNow;
+        user.IsActive =
+            request.IsActive;
+
+        user.UpdatedAt =
+            DateTime.UtcNow;
 
         if (!request.IsActive)
         {
@@ -565,21 +655,24 @@ public sealed class UsersController : ControllerBase
                 cancellationToken);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = request.IsActive
-                ? "KullanÄ±cÄ± aktif hÃ¢le getirildi."
-                : "KullanÄ±cÄ± pasif hÃ¢le getirildi.",
-            data = new
-            {
-                user.Id,
-                user.IsActive,
-                user.UpdatedAt
-            }
-        });
+            user.Id,
+            user.IsActive,
+            user.UpdatedAt
+        };
+
+        var message = request.IsActive
+            ? "Kullanıcı aktif hâle getirildi."
+            : "Kullanıcı pasif hâle getirildi.";
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                message));
     }
 
     // POST: api/v1/users/{id}/roles
@@ -603,7 +696,8 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "KullanÄ±cÄ± bulunamadÄ± veya aktif deÄŸil."
+                message =
+                    "Kullanıcı bulunamadı veya aktif değil."
             });
         }
 
@@ -620,16 +714,19 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Rol bulunamadÄ± veya aktif deÄŸil."
+                message =
+                    "Rol bulunamadı veya aktif değil."
             });
         }
 
-        var existingUserRole = await _dbContext.UserRoles
-            .FirstOrDefaultAsync(
-                userRole =>
-                    userRole.UserId == id &&
-                    userRole.RoleId == request.RoleId,
-                cancellationToken);
+        var existingUserRole =
+            await _dbContext.UserRoles
+                .FirstOrDefaultAsync(
+                    userRole =>
+                        userRole.UserId == id &&
+                        userRole.RoleId ==
+                        request.RoleId,
+                    cancellationToken);
 
         if (existingUserRole is not null)
         {
@@ -638,35 +735,39 @@ public sealed class UsersController : ControllerBase
                 return Conflict(new
                 {
                     success = false,
-                    message = "Bu rol kullanÄ±cÄ±ya zaten atanmÄ±ÅŸ."
+                    message =
+                        "Bu rol kullanıcıya zaten atanmış."
                 });
             }
 
             existingUserRole.IsDeleted = false;
-            existingUserRole.UpdatedAt = DateTime.UtcNow;
+            existingUserRole.UpdatedAt =
+                DateTime.UtcNow;
         }
         else
         {
-            _dbContext.UserRoles.Add(new UserRole
-            {
-                UserId = id,
-                RoleId = request.RoleId
-            });
+            _dbContext.UserRoles.Add(
+                new UserRole
+                {
+                    UserId = id,
+                    RoleId = request.RoleId
+                });
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = "Rol kullanÄ±cÄ±ya baÅŸarÄ±yla atandÄ±.",
-            data = new
-            {
-                role.Id,
-                role.Name,
-                role.Code
-            }
-        });
+            role.Id,
+            role.Name,
+            role.Code
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Rol kullanıcıya başarıyla atandı."));
     }
 
     // DELETE: api/v1/users/{id}/roles/{roleId}
@@ -689,12 +790,13 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "KullanÄ±cÄ± bulunamadÄ±."
+                message = "Kullanıcı bulunamadı."
             });
         }
 
         var userRole = await _dbContext.UserRoles
-            .Include(userRole => userRole.Role)
+            .Include(userRole =>
+                userRole.Role)
             .FirstOrDefaultAsync(
                 userRole =>
                     userRole.UserId == id &&
@@ -707,27 +809,31 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "KullanÄ±cÄ±ya atanmÄ±ÅŸ bÃ¶yle bir rol bulunamadÄ±."
+                message =
+                    "Kullanıcıya atanmış böyle bir rol bulunamadı."
             });
         }
 
-        if (userRole.Role.Code == SuperAdminRoleCode)
+        if (userRole.Role.Code ==
+            SuperAdminRoleCode)
         {
-            var currentUserId = GetCurrentUserId();
+            var currentUserId =
+                GetCurrentUserId();
 
             if (currentUserId == id)
             {
                 return Conflict(new
                 {
                     success = false,
-                    message = "Kendi SUPER_ADMIN rolÃ¼nÃ¼zÃ¼ kaldÄ±ramazsÄ±nÄ±z."
+                    message =
+                        "Kendi SUPER_ADMIN rolünüzü kaldıramazsınız."
                 });
             }
 
             var protectionResult =
                 await CheckSuperAdminProtectionAsync(
                     id,
-                    "Son aktif SUPER_ADMIN rolÃ¼ kaldÄ±rÄ±lamaz.",
+                    "Son aktif SUPER_ADMIN rolü kaldırılamaz.",
                     cancellationToken);
 
             if (protectionResult is not null)
@@ -737,21 +843,23 @@ public sealed class UsersController : ControllerBase
         }
 
         userRole.IsDeleted = true;
-        userRole.UpdatedAt = DateTime.UtcNow;
+        userRole.UpdatedAt =
+            DateTime.UtcNow;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = "Rol kullanÄ±cÄ±dan baÅŸarÄ±yla kaldÄ±rÄ±ldÄ±.",
-            data = new
-            {
-                userRole.Role.Id,
-                userRole.Role.Name,
-                userRole.Role.Code
-            }
-        });
+            userRole.Role.Id,
+            userRole.Role.Name,
+            userRole.Role.Code
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Rol kullanıcıdan başarıyla kaldırıldı."));
     }
 
     // POST: api/v1/users/{id}/companies
@@ -775,14 +883,16 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "KullanÄ±cÄ± bulunamadÄ± veya aktif deÄŸil."
+                message =
+                    "Kullanıcı bulunamadı veya aktif değil."
             });
         }
 
         var company = await _dbContext.Companies
             .FirstOrDefaultAsync(
                 company =>
-                    company.Id == request.CompanyId &&
+                    company.Id ==
+                    request.CompanyId &&
                     !company.IsDeleted &&
                     company.IsActive,
                 cancellationToken);
@@ -792,16 +902,19 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "Firma bulunamadÄ± veya aktif deÄŸil."
+                message =
+                    "Firma bulunamadı veya aktif değil."
             });
         }
 
         var existingCompanyUser =
-            await _dbContext.CompanyUsers.FirstOrDefaultAsync(
-                companyUser =>
-                    companyUser.UserId == id &&
-                    companyUser.CompanyId == request.CompanyId,
-                cancellationToken);
+            await _dbContext.CompanyUsers
+                .FirstOrDefaultAsync(
+                    companyUser =>
+                        companyUser.UserId == id &&
+                        companyUser.CompanyId ==
+                        request.CompanyId,
+                    cancellationToken);
 
         if (existingCompanyUser is not null)
         {
@@ -811,96 +924,109 @@ public sealed class UsersController : ControllerBase
                 return Conflict(new
                 {
                     success = false,
-                    message = "Bu firma kullanÄ±cÄ±ya zaten atanmÄ±ÅŸ."
+                    message =
+                        "Bu firma kullanıcıya zaten atanmış."
                 });
             }
 
             existingCompanyUser.IsDeleted = false;
             existingCompanyUser.IsActive = true;
-            existingCompanyUser.UpdatedAt = DateTime.UtcNow;
+            existingCompanyUser.UpdatedAt =
+                DateTime.UtcNow;
         }
         else
         {
-            _dbContext.CompanyUsers.Add(new CompanyUser
-            {
-                UserId = id,
-                CompanyId = request.CompanyId,
-                IsActive = true
-            });
+            _dbContext.CompanyUsers.Add(
+                new CompanyUser
+                {
+                    UserId = id,
+                    CompanyId =
+                        request.CompanyId,
+                    IsActive = true
+                });
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = "Firma kullanÄ±cÄ±ya baÅŸarÄ±yla atandÄ±.",
-            data = new
-            {
-                company.Id,
-                company.Name
-            }
-        });
+            company.Id,
+            company.Name
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Firma kullanıcıya başarıyla atandı."));
     }
 
     // DELETE: api/v1/users/{id}/companies/{companyId}
-    [HttpDelete("{id:guid}/companies/{companyId:guid}")]
+    [HttpDelete(
+        "{id:guid}/companies/{companyId:guid}")]
     [HasPermission("USERS.UPDATE")]
     public async Task<IActionResult> RemoveCompany(
         Guid id,
         Guid companyId,
         CancellationToken cancellationToken)
     {
-        var userExists = await _dbContext.Users.AnyAsync(
-            user =>
-                user.Id == id &&
-                !user.IsDeleted,
-            cancellationToken);
+        var userExists =
+            await _dbContext.Users.AnyAsync(
+                user =>
+                    user.Id == id &&
+                    !user.IsDeleted,
+                cancellationToken);
 
         if (!userExists)
         {
             return NotFound(new
             {
                 success = false,
-                message = "KullanÄ±cÄ± bulunamadÄ±."
+                message = "Kullanıcı bulunamadı."
             });
         }
 
-        var companyUser = await _dbContext.CompanyUsers
-            .Include(companyUser => companyUser.Company)
-            .FirstOrDefaultAsync(
-                companyUser =>
-                    companyUser.UserId == id &&
-                    companyUser.CompanyId == companyId &&
-                    !companyUser.IsDeleted &&
-                    companyUser.IsActive,
-                cancellationToken);
+        var companyUser =
+            await _dbContext.CompanyUsers
+                .Include(companyUser =>
+                    companyUser.Company)
+                .FirstOrDefaultAsync(
+                    companyUser =>
+                        companyUser.UserId == id &&
+                        companyUser.CompanyId ==
+                        companyId &&
+                        !companyUser.IsDeleted &&
+                        companyUser.IsActive,
+                    cancellationToken);
 
         if (companyUser is null)
         {
             return NotFound(new
             {
                 success = false,
-                message = "KullanÄ±cÄ±ya atanmÄ±ÅŸ bÃ¶yle bir firma bulunamadÄ±."
+                message =
+                    "Kullanıcıya atanmış böyle bir firma bulunamadı."
             });
         }
 
         companyUser.IsDeleted = true;
         companyUser.IsActive = false;
-        companyUser.UpdatedAt = DateTime.UtcNow;
+        companyUser.UpdatedAt =
+            DateTime.UtcNow;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken);
 
-        return Ok(new
+        var responseData = new
         {
-            success = true,
-            message = "Firma kullanÄ±cÄ±dan baÅŸarÄ±yla kaldÄ±rÄ±ldÄ±.",
-            data = new
-            {
-                companyUser.Company.Id,
-                companyUser.Company.Name
-            }
-        });
+            companyUser.Company.Id,
+            companyUser.Company.Name
+        };
+
+        return Ok(
+            ApiResponse<object>.Ok(
+                responseData,
+                "Firma kullanıcıdan başarıyla kaldırıldı."));
     }
 
     // DELETE: api/v1/users/{id}
@@ -910,14 +1036,16 @@ public sealed class UsersController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId =
+            GetCurrentUserId();
 
         if (currentUserId == id)
         {
             return Conflict(new
             {
                 success = false,
-                message = "Kendi kullanÄ±cÄ± hesabÄ±nÄ±zÄ± silemezsiniz."
+                message =
+                    "Kendi kullanıcı hesabınızı silemezsiniz."
             });
         }
 
@@ -933,14 +1061,14 @@ public sealed class UsersController : ControllerBase
             return NotFound(new
             {
                 success = false,
-                message = "KullanÄ±cÄ± bulunamadÄ±."
+                message = "Kullanıcı bulunamadı."
             });
         }
 
         var protectionResult =
             await CheckSuperAdminProtectionAsync(
                 id,
-                "Son aktif SUPER_ADMIN kullanÄ±cÄ±sÄ± silinemez.",
+                "Son aktif SUPER_ADMIN kullanıcısı silinemez.",
                 cancellationToken);
 
         if (protectionResult is not null)
@@ -949,22 +1077,26 @@ public sealed class UsersController : ControllerBase
         }
 
         await using var transaction =
-            await _dbContext.Database.BeginTransactionAsync(
-                cancellationToken);
+            await _dbContext.Database
+                .BeginTransactionAsync(
+                    cancellationToken);
 
         try
         {
-            var now = DateTime.UtcNow;
+            var now =
+                DateTime.UtcNow;
 
             user.IsDeleted = true;
             user.IsActive = false;
             user.UpdatedAt = now;
 
-            var userRoles = await _dbContext.UserRoles
-                .Where(userRole =>
-                    userRole.UserId == id &&
-                    !userRole.IsDeleted)
-                .ToListAsync(cancellationToken);
+            var userRoles =
+                await _dbContext.UserRoles
+                    .Where(userRole =>
+                        userRole.UserId == id &&
+                        !userRole.IsDeleted)
+                    .ToListAsync(
+                        cancellationToken);
 
             foreach (var userRole in userRoles)
             {
@@ -972,11 +1104,13 @@ public sealed class UsersController : ControllerBase
                 userRole.UpdatedAt = now;
             }
 
-            var companyUsers = await _dbContext.CompanyUsers
-                .Where(companyUser =>
-                    companyUser.UserId == id &&
-                    !companyUser.IsDeleted)
-                .ToListAsync(cancellationToken);
+            var companyUsers =
+                await _dbContext.CompanyUsers
+                    .Where(companyUser =>
+                        companyUser.UserId == id &&
+                        !companyUser.IsDeleted)
+                    .ToListAsync(
+                        cancellationToken);
 
             foreach (var companyUser in companyUsers)
             {
@@ -990,45 +1124,54 @@ public sealed class UsersController : ControllerBase
                 now,
                 cancellationToken);
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(
+                cancellationToken);
 
-            return Ok(new
-            {
-                success = true,
-                message = "KullanÄ±cÄ± baÅŸarÄ±yla silindi."
-            });
+            await transaction.CommitAsync(
+                cancellationToken);
+
+            return Ok(
+                MessageResponse.Ok(
+                    "Kullanıcı başarıyla silindi."));
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            await transaction.RollbackAsync(
+                cancellationToken);
+
             throw;
         }
     }
 
     private Guid? GetCurrentUserId()
     {
-        var userIdValue = User.FindFirstValue(
-            ClaimTypes.NameIdentifier);
+        var userIdValue =
+            User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
 
-        return Guid.TryParse(userIdValue, out var userId)
+        return Guid.TryParse(
+            userIdValue,
+            out var userId)
             ? userId
             : null;
     }
 
-    private async Task<IActionResult?> CheckSuperAdminProtectionAsync(
-        Guid userId,
-        string errorMessage,
-        CancellationToken cancellationToken)
+    private async Task<IActionResult?>
+        CheckSuperAdminProtectionAsync(
+            Guid userId,
+            string errorMessage,
+            CancellationToken cancellationToken)
     {
-        var isSuperAdmin = await _dbContext.UserRoles.AnyAsync(
-            userRole =>
-                userRole.UserId == userId &&
-                !userRole.IsDeleted &&
-                !userRole.Role.IsDeleted &&
-                userRole.Role.IsActive &&
-                userRole.Role.Code == SuperAdminRoleCode,
-            cancellationToken);
+        var isSuperAdmin =
+            await _dbContext.UserRoles.AnyAsync(
+                userRole =>
+                    userRole.UserId == userId &&
+                    !userRole.IsDeleted &&
+                    !userRole.Role.IsDeleted &&
+                    userRole.Role.IsActive &&
+                    userRole.Role.Code ==
+                    SuperAdminRoleCode,
+                cancellationToken);
 
         if (!isSuperAdmin)
         {
@@ -1041,7 +1184,8 @@ public sealed class UsersController : ControllerBase
                     !userRole.IsDeleted &&
                     !userRole.Role.IsDeleted &&
                     userRole.Role.IsActive &&
-                    userRole.Role.Code == SuperAdminRoleCode &&
+                    userRole.Role.Code ==
+                    SuperAdminRoleCode &&
                     !userRole.User.IsDeleted &&
                     userRole.User.IsActive,
                 cancellationToken);
@@ -1063,12 +1207,15 @@ public sealed class UsersController : ControllerBase
         DateTime now,
         CancellationToken cancellationToken)
     {
-        var activeOtpCodes = await _dbContext.OtpCodes
-            .Where(otpCode =>
-                otpCode.PhoneNumber == phoneNumber &&
-                !otpCode.IsUsed &&
-                !otpCode.IsDeleted)
-            .ToListAsync(cancellationToken);
+        var activeOtpCodes =
+            await _dbContext.OtpCodes
+                .Where(otpCode =>
+                    otpCode.PhoneNumber ==
+                    phoneNumber &&
+                    !otpCode.IsUsed &&
+                    !otpCode.IsDeleted)
+                .ToListAsync(
+                    cancellationToken);
 
         foreach (var otpCode in activeOtpCodes)
         {
@@ -1077,7 +1224,8 @@ public sealed class UsersController : ControllerBase
         }
     }
 
-    private static string? NormalizeOptionalText(string? value)
+    private static string? NormalizeOptionalText(
+        string? value)
     {
         return string.IsNullOrWhiteSpace(value)
             ? null
