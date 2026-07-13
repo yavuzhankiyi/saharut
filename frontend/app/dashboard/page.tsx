@@ -1,4 +1,6 @@
-﻿"use client";
+"use client";
+
+import AppSidebar from "@/app/components/AppSidebar";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -179,72 +181,7 @@ export default function DashboardPage() {
 
   return (
     <main className="dashboard-layout">
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-logo">S</div>
-
-          <div>
-            <strong>Saharut</strong>
-            <span>Operasyon Platformu</span>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <a className="active" href="/dashboard">
-            <span>⌂</span>
-            Dashboard
-          </a>
-
-          <a href="#">
-            <span>▣</span>
-            Firmalar
-          </a>
-
-          <Link href="/customers">
-  <span>♙</span>
-  Müşteriler
-</Link>
-
-          <a href="#">
-            <span>□</span>
-            Ürünler
-          </a>
-
-          <a href="#">
-            <span>◇</span>
-            Ziyaretler
-          </a>
-
-          <a href="#">
-            <span>◉</span>
-            Kullanıcılar
-          </a>
-
-          <a href="#">
-            <span>⚙</span>
-            Ayarlar
-          </a>
-        </nav>
-
-        <div className="sidebar-user">
-          <div className="user-avatar">
-            {user?.firstName?.charAt(0)}
-            {user?.lastName?.charAt(0)}
-          </div>
-
-          <div>
-            <strong>
-              {user
-                ? `${user.firstName} ${user.lastName}`
-                : "Kullanıcı"}
-            </strong>
-
-            <span>
-              {user?.roles?.[0] ?? "Kullanıcı"}
-            </span>
-          </div>
-        </div>
-      </aside>
+      <AppSidebar />
 
       <section className="dashboard-content">
         <header className="dashboard-header">

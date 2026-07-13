@@ -39,20 +39,16 @@ const initialForm = {
   companyId: "",
   name: "",
   code: "",
-  customerType: "",
-  contactName: "",
-  phoneNumber: "",
-  email: "",
-  taxNumber: "",
-  city: "",
-  district: "",
-  address: "",
-  latitude: "",
-  longitude: "",
-  notes: "",
+  barcode: "",
+  description: "",
+  unit: "",
+  listPrice: "",
+  vatRate: "20",
+  stockQuantity: "0",
+  minimumStockQuantity: "0",
 };
 
-export default function NewCustomerPage() {
+export default function NewProductPage() {
   const router = useRouter();
 
   const [form, setForm] =
@@ -169,11 +165,59 @@ export default function NewCustomerPage() {
       !form.companyId ||
       !form.name.trim() ||
       !form.code.trim() ||
-      !form.customerType.trim()
+      !form.unit.trim()
     ) {
       setIsError(true);
       setMessage(
-        "Firma, müşteri adı, müşteri kodu ve müşteri türü zorunludur."
+        "Firma, ürün adı, ürün kodu ve birim zorunludur."
+      );
+      return;
+    }
+
+    const listPrice =
+      Number(form.listPrice);
+
+    const vatRate =
+      Number(form.vatRate);
+
+    const stockQuantity =
+      Number(form.stockQuantity);
+
+    const minimumStockQuantity =
+      Number(form.minimumStockQuantity);
+
+    if (
+      Number.isNaN(listPrice) ||
+      listPrice < 0
+    ) {
+      setIsError(true);
+      setMessage(
+        "Liste fiyatı sıfırdan küçük olamaz."
+      );
+      return;
+    }
+
+    if (
+      Number.isNaN(vatRate) ||
+      vatRate < 0 ||
+      vatRate > 100
+    ) {
+      setIsError(true);
+      setMessage(
+        "KDV oranı 0 ile 100 arasında olmalıdır."
+      );
+      return;
+    }
+
+    if (
+      Number.isNaN(stockQuantity) ||
+      stockQuantity < 0 ||
+      Number.isNaN(minimumStockQuantity) ||
+      minimumStockQuantity < 0
+    ) {
+      setIsError(true);
+      setMessage(
+        "Stok değerleri sıfırdan küçük olamaz."
       );
       return;
     }
@@ -190,7 +234,7 @@ export default function NewCustomerPage() {
       setIsSaving(true);
 
       const response = await fetch(
-        `${API_URL}/customers`,
+        `${API_URL}/products`,
         {
           method: "POST",
           headers: {
@@ -202,32 +246,15 @@ export default function NewCustomerPage() {
             companyId: form.companyId,
             name: form.name.trim(),
             code: form.code.trim(),
-            customerType:
-              form.customerType.trim(),
-            contactName:
-              form.contactName.trim() || null,
-            phoneNumber:
-              form.phoneNumber.trim() || null,
-            email:
-              form.email.trim() || null,
-            taxNumber:
-              form.taxNumber.trim() || null,
-            city:
-              form.city.trim() || null,
-            district:
-              form.district.trim() || null,
-            address:
-              form.address.trim() || null,
-            latitude:
-              form.latitude.trim()
-                ? Number(form.latitude)
-                : null,
-            longitude:
-              form.longitude.trim()
-                ? Number(form.longitude)
-                : null,
-            notes:
-              form.notes.trim() || null,
+            barcode:
+              form.barcode.trim() || null,
+            description:
+              form.description.trim() || null,
+            unit: form.unit.trim(),
+            listPrice,
+            vatRate,
+            stockQuantity,
+            minimumStockQuantity,
           }),
         }
       );
@@ -246,17 +273,17 @@ export default function NewCustomerPage() {
         throw new Error(
           validationMessage ||
             result.message ||
-            "Müşteri oluşturulamadı."
+            "Ürün oluşturulamadı."
         );
       }
 
       setMessage(
         result.message ??
-          "Müşteri başarıyla oluşturuldu."
+          "Ürün başarıyla oluşturuldu."
       );
 
       setTimeout(() => {
-        router.push("/customers");
+        router.push("/products");
       }, 800);
     } catch (error) {
       setIsError(true);
@@ -284,26 +311,28 @@ export default function NewCustomerPage() {
         <header className="dashboard-header">
           <div>
             <span className="page-label">
-              Müşteri Yönetimi
+              Ürün Yönetimi
             </span>
 
-            <h1>Yeni müşteri</h1>
+            <h1>Yeni ürün</h1>
 
             <p>
-              Yeni müşteri kaydı oluşturun.
+              Yeni ürün kaydı ve başlangıç stok
+              bilgilerini oluşturun.
             </p>
           </div>
 
           <div className="header-actions">
             <Link
               className="secondary-link-button"
-              href="/customers"
+              href="/products"
             >
               Listeye dön
             </Link>
 
             <button
               className="logout-button"
+              type="button"
               onClick={handleLogout}
             >
               Çıkış yap
@@ -318,10 +347,8 @@ export default function NewCustomerPage() {
           <section className="form-panel">
             <div className="form-panel-header">
               <div>
-                <h2>Temel bilgiler</h2>
-                <p>
-                  Müşterinin firma ve kimlik bilgileri
-                </p>
+                <h2>Temel ürün bilgileri</h2>
+                <p>Firma, ürün adı ve ürün kodu</p>
               </div>
 
               <span>Zorunlu alanlar *</span>
@@ -367,7 +394,7 @@ export default function NewCustomerPage() {
 
               <div className="form-field">
                 <label htmlFor="name">
-                  Müşteri adı *
+                  Ürün adı *
                 </label>
 
                 <input
@@ -380,7 +407,7 @@ export default function NewCustomerPage() {
                     )
                   }
                   maxLength={200}
-                  placeholder="Örn. ABC Market"
+                  placeholder="Örn. Premium Kahve"
                   disabled={isSaving}
                   required
                 />
@@ -388,7 +415,7 @@ export default function NewCustomerPage() {
 
               <div className="form-field">
                 <label htmlFor="code">
-                  Müşteri kodu *
+                  Ürün kodu *
                 </label>
 
                 <input
@@ -402,23 +429,43 @@ export default function NewCustomerPage() {
                     )
                   }
                   maxLength={100}
-                  placeholder="Örn. CUS-001"
+                  placeholder="Örn. PRD-001"
                   disabled={isSaving}
                   required
                 />
               </div>
 
               <div className="form-field">
-                <label htmlFor="customerType">
-                  Müşteri türü *
+                <label htmlFor="barcode">
+                  Barkod
+                </label>
+
+                <input
+                  id="barcode"
+                  value={form.barcode}
+                  onChange={(event) =>
+                    updateField(
+                      "barcode",
+                      event.target.value
+                    )
+                  }
+                  maxLength={100}
+                  placeholder="8690000000001"
+                  disabled={isSaving}
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="unit">
+                  Birim *
                 </label>
 
                 <select
-                  id="customerType"
-                  value={form.customerType}
+                  id="unit"
+                  value={form.unit}
                   onChange={(event) =>
                     updateField(
-                      "customerType",
+                      "unit",
                       event.target.value
                     )
                   }
@@ -426,240 +473,56 @@ export default function NewCustomerPage() {
                   required
                 >
                   <option value="">
-                    Tür seçin
+                    Birim seçin
                   </option>
-                  <option value="Market">
-                    Market
+
+                  <option value="Adet">
+                    Adet
                   </option>
-                  <option value="Bayi">
-                    Bayi
+
+                  <option value="Kutu">
+                    Kutu
                   </option>
-                  <option value="Distribütör">
-                    Distribütör
+
+                  <option value="Koli">
+                    Koli
                   </option>
-                  <option value="Perakende">
-                    Perakende
+
+                  <option value="Paket">
+                    Paket
                   </option>
-                  <option value="Kurumsal">
-                    Kurumsal
+
+                  <option value="Kilogram">
+                    Kilogram
                   </option>
-                  <option value="Diğer">
-                    Diğer
+
+                  <option value="Litre">
+                    Litre
+                  </option>
+
+                  <option value="Metre">
+                    Metre
                   </option>
                 </select>
               </div>
 
-              <div className="form-field">
-                <label htmlFor="taxNumber">
-                  Vergi numarası
-                </label>
-
-                <input
-                  id="taxNumber"
-                  value={form.taxNumber}
-                  onChange={(event) =>
-                    updateField(
-                      "taxNumber",
-                      event.target.value
-                    )
-                  }
-                  maxLength={50}
-                  placeholder="Vergi numarası"
-                  disabled={isSaving}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="form-panel">
-            <div className="form-panel-header">
-              <div>
-                <h2>İletişim bilgileri</h2>
-                <p>
-                  Yetkili kişi ve iletişim detayları
-                </p>
-              </div>
-            </div>
-
-            <div className="form-grid">
-              <div className="form-field">
-                <label htmlFor="contactName">
-                  Yetkili kişi
-                </label>
-
-                <input
-                  id="contactName"
-                  value={form.contactName}
-                  onChange={(event) =>
-                    updateField(
-                      "contactName",
-                      event.target.value
-                    )
-                  }
-                  maxLength={200}
-                  placeholder="Ad soyad"
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="form-field">
-                <label htmlFor="phoneNumber">
-                  Telefon
-                </label>
-
-                <input
-                  id="phoneNumber"
-                  type="tel"
-                  value={form.phoneNumber}
-                  onChange={(event) =>
-                    updateField(
-                      "phoneNumber",
-                      event.target.value
-                    )
-                  }
-                  maxLength={30}
-                  placeholder="0555 111 22 33"
-                  disabled={isSaving}
-                />
-              </div>
-
               <div className="form-field full">
-                <label htmlFor="email">
-                  E-posta
-                </label>
-
-                <input
-                  id="email"
-                  type="email"
-                  value={form.email}
-                  onChange={(event) =>
-                    updateField(
-                      "email",
-                      event.target.value
-                    )
-                  }
-                  maxLength={200}
-                  placeholder="ornek@firma.com"
-                  disabled={isSaving}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="form-panel">
-            <div className="form-panel-header">
-              <div>
-                <h2>Adres ve konum</h2>
-                <p>
-                  Müşterinin saha ziyaret konumu
-                </p>
-              </div>
-            </div>
-
-            <div className="form-grid">
-              <div className="form-field">
-                <label htmlFor="city">
-                  Şehir
-                </label>
-
-                <input
-                  id="city"
-                  value={form.city}
-                  onChange={(event) =>
-                    updateField(
-                      "city",
-                      event.target.value
-                    )
-                  }
-                  maxLength={100}
-                  placeholder="Sakarya"
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="form-field">
-                <label htmlFor="district">
-                  İlçe
-                </label>
-
-                <input
-                  id="district"
-                  value={form.district}
-                  onChange={(event) =>
-                    updateField(
-                      "district",
-                      event.target.value
-                    )
-                  }
-                  maxLength={100}
-                  placeholder="Serdivan"
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="form-field full">
-                <label htmlFor="address">
-                  Adres
+                <label htmlFor="description">
+                  Açıklama
                 </label>
 
                 <textarea
-                  id="address"
-                  value={form.address}
+                  id="description"
+                  value={form.description}
                   onChange={(event) =>
                     updateField(
-                      "address",
+                      "description",
                       event.target.value
                     )
                   }
                   maxLength={1000}
                   rows={4}
-                  placeholder="Açık adres"
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="form-field">
-                <label htmlFor="latitude">
-                  Enlem
-                </label>
-
-                <input
-                  id="latitude"
-                  type="number"
-                  step="any"
-                  min="-90"
-                  max="90"
-                  value={form.latitude}
-                  onChange={(event) =>
-                    updateField(
-                      "latitude",
-                      event.target.value
-                    )
-                  }
-                  placeholder="40.7569"
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="form-field">
-                <label htmlFor="longitude">
-                  Boylam
-                </label>
-
-                <input
-                  id="longitude"
-                  type="number"
-                  step="any"
-                  min="-180"
-                  max="180"
-                  value={form.longitude}
-                  onChange={(event) =>
-                    updateField(
-                      "longitude",
-                      event.target.value
-                    )
-                  }
-                  placeholder="30.3781"
+                  placeholder="Ürün hakkında açıklama..."
                   disabled={isSaving}
                 />
               </div>
@@ -669,27 +532,127 @@ export default function NewCustomerPage() {
           <section className="form-panel">
             <div className="form-panel-header">
               <div>
-                <h2>Notlar</h2>
-                <p>
-                  Müşteri hakkında ek açıklamalar
-                </p>
+                <h2>Fiyatlandırma</h2>
+                <p>Liste fiyatı ve KDV oranı</p>
               </div>
             </div>
 
-            <div className="form-field full">
-              <textarea
-                value={form.notes}
-                onChange={(event) =>
-                  updateField(
-                    "notes",
-                    event.target.value
-                  )
-                }
-                maxLength={2000}
-                rows={5}
-                placeholder="Müşteriyle ilgili notlar..."
-                disabled={isSaving}
-              />
+            <div className="form-grid">
+              <div className="form-field">
+                <label htmlFor="listPrice">
+                  Liste fiyatı *
+                </label>
+
+                <div className="number-field">
+                  <input
+                    id="listPrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.listPrice}
+                    onChange={(event) =>
+                      updateField(
+                        "listPrice",
+                        event.target.value
+                      )
+                    }
+                    placeholder="0,00"
+                    disabled={isSaving}
+                    required
+                  />
+
+                  <span>₺</span>
+                </div>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="vatRate">
+                  KDV oranı
+                </label>
+
+                <div className="number-field">
+                  <input
+                    id="vatRate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={form.vatRate}
+                    onChange={(event) =>
+                      updateField(
+                        "vatRate",
+                        event.target.value
+                      )
+                    }
+                    disabled={isSaving}
+                  />
+
+                  <span>%</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="form-panel">
+            <div className="form-panel-header">
+              <div>
+                <h2>Stok bilgileri</h2>
+                <p>Mevcut stok ve uyarı seviyesi</p>
+              </div>
+            </div>
+
+            <div className="form-grid">
+              <div className="form-field">
+                <label htmlFor="stockQuantity">
+                  Başlangıç stoğu
+                </label>
+
+                <input
+                  id="stockQuantity"
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  value={form.stockQuantity}
+                  onChange={(event) =>
+                    updateField(
+                      "stockQuantity",
+                      event.target.value
+                    )
+                  }
+                  disabled={isSaving}
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="minimumStockQuantity">
+                  Minimum stok
+                </label>
+
+                <input
+                  id="minimumStockQuantity"
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  value={form.minimumStockQuantity}
+                  onChange={(event) =>
+                    updateField(
+                      "minimumStockQuantity",
+                      event.target.value
+                    )
+                  }
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+
+            <div className="stock-help-box">
+              <span>!</span>
+
+              <p>
+                Mevcut stok minimum stok seviyesine
+                eşit veya daha düşük olduğunda ürün
+                düşük stok olarak işaretlenir.
+              </p>
             </div>
           </section>
 
@@ -708,7 +671,7 @@ export default function NewCustomerPage() {
           <div className="form-actions">
             <Link
               className="cancel-form-button"
-              href="/customers"
+              href="/products"
             >
               İptal
             </Link>
@@ -723,7 +686,7 @@ export default function NewCustomerPage() {
             >
               {isSaving
                 ? "Kaydediliyor..."
-                : "Müşteriyi kaydet"}
+                : "Ürünü kaydet"}
             </button>
           </div>
         </form>

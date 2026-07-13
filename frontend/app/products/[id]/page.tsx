@@ -14,28 +14,22 @@ interface Company {
   isActive: boolean;
 }
 
-interface Customer {
+interface Product {
   id: string;
   companyId: string;
-  company: {
-    id: string;
-    name: string;
-    isActive: boolean;
-  };
+  company: Company;
   name: string;
   code: string;
-  customerType: string;
-  contactName?: string | null;
-  phoneNumber?: string | null;
-  email?: string | null;
-  taxNumber?: string | null;
-  city?: string | null;
-  district?: string | null;
-  address?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  notes?: string | null;
+  barcode?: string | null;
+  description?: string | null;
+  unit: string;
+  listPrice: number;
+  vatRate: number;
+  stockQuantity: number;
+  minimumStockQuantity: number;
   isActive: boolean;
+  isLowStock: boolean;
+  priceWithVat: number;
   createdAt: string;
   updatedAt?: string | null;
 }
@@ -63,27 +57,23 @@ const emptyForm = {
   companyId: "",
   name: "",
   code: "",
-  customerType: "",
-  contactName: "",
-  phoneNumber: "",
-  email: "",
-  taxNumber: "",
-  city: "",
-  district: "",
-  address: "",
-  latitude: "",
-  longitude: "",
-  notes: "",
+  barcode: "",
+  description: "",
+  unit: "",
+  listPrice: "0",
+  vatRate: "20",
+  stockQuantity: "0",
+  minimumStockQuantity: "0",
   isActive: true,
 };
 
-export default function CustomerDetailPage() {
+export default function ProductDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const customerId = params.id;
+  const productId = params.id;
 
-  const [customer, setCustomer] =
-    useState<Customer | null>(null);
+  const [product, setProduct] =
+    useState<Product | null>(null);
 
   const [companies, setCompanies] =
     useState<Company[]>([]);
@@ -134,17 +124,16 @@ export default function CustomerDetailPage() {
 
     async function loadPage() {
       try {
-        const [customerResponse, companyResponse] =
+        const [productResponse, companyResponse] =
           await Promise.all([
             fetch(
-              `${API_URL}/customers/${customerId}`,
+              `${API_URL}/products/${productId}`,
               {
                 headers: {
                   Authorization: `Bearer ${token}`,
                 },
               }
             ),
-
             fetch(
               `${API_URL}/companies?page=1&pageSize=100&isActive=true`,
               {
@@ -156,7 +145,7 @@ export default function CustomerDetailPage() {
           ]);
 
         if (
-          customerResponse.status === 401 ||
+          productResponse.status === 401 ||
           companyResponse.status === 401
         ) {
           localStorage.clear();
@@ -164,22 +153,22 @@ export default function CustomerDetailPage() {
           return;
         }
 
-        const customerResult =
-          (await customerResponse.json()) as
-            ApiResponse<Customer>;
+        const productResult =
+          (await productResponse.json()) as
+            ApiResponse<Product>;
 
         const companyResult =
           (await companyResponse.json()) as
             CompanyListResponse;
 
         if (
-          !customerResponse.ok ||
-          !customerResult.success ||
-          !customerResult.data
+          !productResponse.ok ||
+          !productResult.success ||
+          !productResult.data
         ) {
           throw new Error(
-            customerResult.message ??
-              "Müşteri bilgileri alınamadı."
+            productResult.message ??
+              "Ürün bilgileri alınamadı."
           );
         }
 
@@ -193,40 +182,29 @@ export default function CustomerDetailPage() {
           );
         }
 
-        const loadedCustomer =
-          customerResult.data;
+        const loadedProduct =
+          productResult.data;
 
-        setCustomer(loadedCustomer);
+        setProduct(loadedProduct);
         setCompanies(companyResult.data);
 
         setForm({
-          companyId: loadedCustomer.companyId,
-          name: loadedCustomer.name,
-          code: loadedCustomer.code,
-          customerType:
-            loadedCustomer.customerType,
-          contactName:
-            loadedCustomer.contactName ?? "",
-          phoneNumber:
-            loadedCustomer.phoneNumber ?? "",
-          email:
-            loadedCustomer.email ?? "",
-          taxNumber:
-            loadedCustomer.taxNumber ?? "",
-          city:
-            loadedCustomer.city ?? "",
-          district:
-            loadedCustomer.district ?? "",
-          address:
-            loadedCustomer.address ?? "",
-          latitude:
-            loadedCustomer.latitude?.toString() ?? "",
-          longitude:
-            loadedCustomer.longitude?.toString() ?? "",
-          notes:
-            loadedCustomer.notes ?? "",
-          isActive:
-            loadedCustomer.isActive,
+          companyId: loadedProduct.companyId,
+          name: loadedProduct.name,
+          code: loadedProduct.code,
+          barcode: loadedProduct.barcode ?? "",
+          description:
+            loadedProduct.description ?? "",
+          unit: loadedProduct.unit,
+          listPrice:
+            loadedProduct.listPrice.toString(),
+          vatRate:
+            loadedProduct.vatRate.toString(),
+          stockQuantity:
+            loadedProduct.stockQuantity.toString(),
+          minimumStockQuantity:
+            loadedProduct.minimumStockQuantity.toString(),
+          isActive: loadedProduct.isActive,
         });
       } catch (error) {
         setIsError(true);
@@ -242,7 +220,7 @@ export default function CustomerDetailPage() {
     }
 
     loadPage();
-  }, [customerId, router]);
+  }, [productId, router]);
 
   function updateField(
     field: keyof typeof emptyForm,
@@ -252,6 +230,13 @@ export default function CustomerDetailPage() {
       ...current,
       [field]: value,
     }));
+  }
+
+  function formatCurrency(value: number) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY",
+    }).format(value);
   }
 
   async function handleUpdate(
@@ -274,7 +259,7 @@ export default function CustomerDetailPage() {
       setIsSaving(true);
 
       const response = await fetch(
-        `${API_URL}/customers/${customerId}`,
+        `${API_URL}/products/${productId}`,
         {
           method: "PUT",
           headers: {
@@ -286,32 +271,17 @@ export default function CustomerDetailPage() {
             companyId: form.companyId,
             name: form.name.trim(),
             code: form.code.trim(),
-            customerType:
-              form.customerType.trim(),
-            contactName:
-              form.contactName.trim() || null,
-            phoneNumber:
-              form.phoneNumber.trim() || null,
-            email:
-              form.email.trim() || null,
-            taxNumber:
-              form.taxNumber.trim() || null,
-            city:
-              form.city.trim() || null,
-            district:
-              form.district.trim() || null,
-            address:
-              form.address.trim() || null,
-            latitude:
-              form.latitude
-                ? Number(form.latitude)
-                : null,
-            longitude:
-              form.longitude
-                ? Number(form.longitude)
-                : null,
-            notes:
-              form.notes.trim() || null,
+            barcode:
+              form.barcode.trim() || null,
+            description:
+              form.description.trim() || null,
+            unit: form.unit.trim(),
+            listPrice: Number(form.listPrice),
+            vatRate: Number(form.vatRate),
+            stockQuantity:
+              Number(form.stockQuantity),
+            minimumStockQuantity:
+              Number(form.minimumStockQuantity),
             isActive: form.isActive,
           }),
         }
@@ -319,13 +289,9 @@ export default function CustomerDetailPage() {
 
       const result =
         (await response.json()) as
-          ApiResponse<Customer>;
+          ApiResponse<Partial<Product>>;
 
-      if (
-        !response.ok ||
-        !result.success ||
-        !result.data
-      ) {
+      if (!response.ok || !result.success) {
         const validationMessage =
           result.errors
             ? Object.values(result.errors)
@@ -336,35 +302,51 @@ export default function CustomerDetailPage() {
         throw new Error(
           validationMessage ||
             result.message ||
-            "Müşteri güncellenemedi."
+            "Ürün güncellenemedi."
         );
       }
 
       const selectedCompany =
         companies.find(
           (company) =>
-            company.id === result.data?.companyId
+            company.id === form.companyId
         );
 
-      setCustomer({
-        ...customer!,
+      const updatedProduct: Product = {
+        ...product!,
         ...result.data,
-        company: {
-          id: result.data.companyId,
-          name:
-            selectedCompany?.name ??
-            customer!.company.name,
-          isActive:
-            selectedCompany?.isActive ?? true,
-        },
-      });
+        companyId: form.companyId,
+        company:
+          selectedCompany ?? product!.company,
+        name: form.name.trim(),
+        code: form.code.trim(),
+        barcode:
+          form.barcode.trim() || null,
+        description:
+          form.description.trim() || null,
+        unit: form.unit,
+        listPrice: Number(form.listPrice),
+        vatRate: Number(form.vatRate),
+        stockQuantity:
+          Number(form.stockQuantity),
+        minimumStockQuantity:
+          Number(form.minimumStockQuantity),
+        isActive: form.isActive,
+        isLowStock:
+          Number(form.stockQuantity) <=
+          Number(form.minimumStockQuantity),
+        priceWithVat:
+          Number(form.listPrice) *
+          (1 + Number(form.vatRate) / 100),
+      };
+
+      setProduct(updatedProduct);
+      setIsEditing(false);
 
       setMessage(
         result.message ??
-          "Müşteri başarıyla güncellendi."
+          "Ürün başarıyla güncellendi."
       );
-
-      setIsEditing(false);
     } catch (error) {
       setIsError(true);
 
@@ -379,10 +361,14 @@ export default function CustomerDetailPage() {
   }
 
   async function handleStatusChange() {
+    if (!product) {
+      return;
+    }
+
     const token =
       localStorage.getItem("saharut_access_token");
 
-    if (!token || !customer) {
+    if (!token) {
       router.replace("/");
       return;
     }
@@ -393,10 +379,10 @@ export default function CustomerDetailPage() {
       setIsError(false);
 
       const newStatus =
-        !customer.isActive;
+        !product.isActive;
 
       const response = await fetch(
-        `${API_URL}/customers/${customerId}/status`,
+        `${API_URL}/products/${productId}/status`,
         {
           method: "PATCH",
           headers: {
@@ -412,19 +398,16 @@ export default function CustomerDetailPage() {
 
       const result =
         (await response.json()) as
-          ApiResponse<{
-            id: string;
-            isActive: boolean;
-          }>;
+          ApiResponse<object>;
 
       if (!response.ok || !result.success) {
         throw new Error(
           result.message ??
-            "Müşteri durumu değiştirilemedi."
+            "Ürün durumu değiştirilemedi."
         );
       }
 
-      setCustomer((current) =>
+      setProduct((current) =>
         current
           ? {
               ...current,
@@ -440,7 +423,7 @@ export default function CustomerDetailPage() {
 
       setMessage(
         result.message ??
-          "Müşteri durumu güncellendi."
+          "Ürün durumu güncellendi."
       );
     } catch (error) {
       setIsError(true);
@@ -458,7 +441,7 @@ export default function CustomerDetailPage() {
   async function handleDelete() {
     const confirmed =
       window.confirm(
-        "Bu müşteriyi silmek istediğinizden emin misiniz?"
+        "Bu ürünü silmek istediğinizden emin misiniz?"
       );
 
     if (!confirmed) {
@@ -475,11 +458,9 @@ export default function CustomerDetailPage() {
 
     try {
       setIsDeleting(true);
-      setMessage("");
-      setIsError(false);
 
       const response = await fetch(
-        `${API_URL}/customers/${customerId}`,
+        `${API_URL}/products/${productId}`,
         {
           method: "DELETE",
           headers: {
@@ -495,11 +476,11 @@ export default function CustomerDetailPage() {
       if (!response.ok || !result.success) {
         throw new Error(
           result.message ??
-            "Müşteri silinemedi."
+            "Ürün silinemedi."
         );
       }
 
-      router.replace("/customers");
+      router.replace("/products");
     } catch (error) {
       setIsError(true);
 
@@ -513,46 +494,6 @@ export default function CustomerDetailPage() {
     }
   }
 
-  function handleCancelEdit() {
-    if (!customer) {
-      return;
-    }
-
-    setForm({
-      companyId: customer.companyId,
-      name: customer.name,
-      code: customer.code,
-      customerType:
-        customer.customerType,
-      contactName:
-        customer.contactName ?? "",
-      phoneNumber:
-        customer.phoneNumber ?? "",
-      email:
-        customer.email ?? "",
-      taxNumber:
-        customer.taxNumber ?? "",
-      city:
-        customer.city ?? "",
-      district:
-        customer.district ?? "",
-      address:
-        customer.address ?? "",
-      latitude:
-        customer.latitude?.toString() ?? "",
-      longitude:
-        customer.longitude?.toString() ?? "",
-      notes:
-        customer.notes ?? "",
-      isActive:
-        customer.isActive,
-    });
-
-    setIsEditing(false);
-    setMessage("");
-    setIsError(false);
-  }
-
   function handleLogout() {
     localStorage.clear();
     router.replace("/");
@@ -562,22 +503,22 @@ export default function CustomerDetailPage() {
     return (
       <main className="dashboard-loading">
         <div className="loading-spinner" />
-        <p>Müşteri bilgileri yükleniyor...</p>
+        <p>Ürün bilgileri yükleniyor...</p>
       </main>
     );
   }
 
-  if (!customer) {
+  if (!product) {
     return (
       <main className="dashboard-error">
-        <h1>Müşteri bulunamadı</h1>
+        <h1>Ürün bulunamadı</h1>
         <p>{message}</p>
 
         <Link
           className="primary-link-button"
-          href="/customers"
+          href="/products"
         >
-          Müşteri listesine dön
+          Ürün listesine dön
         </Link>
       </main>
     );
@@ -591,20 +532,20 @@ export default function CustomerDetailPage() {
         <header className="dashboard-header">
           <div>
             <span className="page-label">
-              Müşteri Detayı
+              Ürün Detayı
             </span>
 
-            <h1>{customer.name}</h1>
+            <h1>{product.name}</h1>
 
             <p>
-              {customer.code} · {customer.company.name}
+              {product.code} · {product.company.name}
             </p>
           </div>
 
           <div className="header-actions">
             <Link
               className="secondary-link-button"
-              href="/customers"
+              href="/products"
             >
               Listeye dön
             </Link>
@@ -635,30 +576,35 @@ export default function CustomerDetailPage() {
           <>
             <section className="customer-profile-card">
               <div className="customer-profile-main">
-                <div className="customer-profile-avatar">
-                  {customer.name
+                <div className="product-profile-avatar">
+                  {product.name
                     .charAt(0)
                     .toUpperCase()}
                 </div>
 
                 <div>
-                  <h2>{customer.name}</h2>
+                  <h2>{product.name}</h2>
+                  <p>{product.unit}</p>
 
-                  <p>
-                    {customer.customerType}
-                  </p>
+                  <div className="product-badge-row">
+                    <span
+                      className={
+                        product.isActive
+                          ? "status-badge active"
+                          : "status-badge passive"
+                      }
+                    >
+                      {product.isActive
+                        ? "Aktif"
+                        : "Pasif"}
+                    </span>
 
-                  <span
-                    className={
-                      customer.isActive
-                        ? "status-badge active"
-                        : "status-badge passive"
-                    }
-                  >
-                    {customer.isActive
-                      ? "Aktif"
-                      : "Pasif"}
-                  </span>
+                    {product.isLowStock && (
+                      <span className="low-stock-badge">
+                        Düşük stok
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -667,12 +613,9 @@ export default function CustomerDetailPage() {
                   className="status-action-button"
                   type="button"
                   onClick={handleStatusChange}
-                  disabled={
-                    isSaving ||
-                    isDeleting
-                  }
+                  disabled={isSaving}
                 >
-                  {customer.isActive
+                  {product.isActive
                     ? "Pasif yap"
                     : "Aktif yap"}
                 </button>
@@ -681,123 +624,112 @@ export default function CustomerDetailPage() {
                   className="danger-action-button"
                   type="button"
                   onClick={handleDelete}
-                  disabled={
-                    isDeleting ||
-                    isSaving
-                  }
+                  disabled={isDeleting}
                 >
                   {isDeleting
                     ? "Siliniyor..."
-                    : "Müşteriyi sil"}
+                    : "Ürünü sil"}
                 </button>
               </div>
             </section>
 
             <section className="detail-grid">
               <article className="detail-panel">
-                <h2>Temel bilgiler</h2>
+                <h2>Ürün bilgileri</h2>
 
                 <div className="detail-list">
                   <div>
-                    <span>Müşteri kodu</span>
+                    <span>Ürün kodu</span>
+                    <strong>{product.code}</strong>
+                  </div>
+
+                  <div>
+                    <span>Barkod</span>
                     <strong>
-                      {customer.code}
+                      {product.barcode ?? "—"}
                     </strong>
                   </div>
 
                   <div>
                     <span>Firma</span>
                     <strong>
-                      {customer.company.name}
+                      {product.company.name}
                     </strong>
                   </div>
 
                   <div>
-                    <span>Müşteri türü</span>
-                    <strong>
-                      {customer.customerType}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Vergi numarası</span>
-                    <strong>
-                      {customer.taxNumber ?? "—"}
-                    </strong>
+                    <span>Birim</span>
+                    <strong>{product.unit}</strong>
                   </div>
                 </div>
               </article>
 
               <article className="detail-panel">
-                <h2>İletişim</h2>
+                <h2>Fiyatlandırma</h2>
 
                 <div className="detail-list">
                   <div>
-                    <span>Yetkili kişi</span>
+                    <span>Liste fiyatı</span>
                     <strong>
-                      {customer.contactName ?? "—"}
+                      {formatCurrency(
+                        product.listPrice
+                      )}
                     </strong>
                   </div>
 
                   <div>
-                    <span>Telefon</span>
+                    <span>KDV oranı</span>
                     <strong>
-                      {customer.phoneNumber ?? "—"}
+                      %{product.vatRate}
                     </strong>
                   </div>
 
                   <div>
-                    <span>E-posta</span>
+                    <span>KDV dâhil fiyat</span>
                     <strong>
-                      {customer.email ?? "—"}
+                      {formatCurrency(
+                        product.priceWithVat
+                      )}
                     </strong>
                   </div>
                 </div>
               </article>
 
               <article className="detail-panel">
-                <h2>Adres</h2>
+                <h2>Stok bilgileri</h2>
 
                 <div className="detail-list">
                   <div>
-                    <span>Şehir</span>
+                    <span>Mevcut stok</span>
                     <strong>
-                      {customer.city ?? "—"}
+                      {product.stockQuantity}
                     </strong>
                   </div>
 
                   <div>
-                    <span>İlçe</span>
+                    <span>Minimum stok</span>
                     <strong>
-                      {customer.district ?? "—"}
+                      {product.minimumStockQuantity}
                     </strong>
                   </div>
 
                   <div>
-                    <span>Açık adres</span>
+                    <span>Stok durumu</span>
                     <strong>
-                      {customer.address ?? "—"}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Koordinat</span>
-                    <strong>
-                      {customer.latitude != null &&
-                      customer.longitude != null
-                        ? `${customer.latitude}, ${customer.longitude}`
-                        : "—"}
+                      {product.isLowStock
+                        ? "Düşük stok"
+                        : "Stok yeterli"}
                     </strong>
                   </div>
                 </div>
               </article>
 
               <article className="detail-panel">
-                <h2>Notlar</h2>
+                <h2>Açıklama</h2>
 
                 <p className="customer-notes">
-                  {customer.notes ??
-                    "Bu müşteri için not eklenmemiş."}
+                  {product.description ??
+                    "Bu ürün için açıklama eklenmemiş."}
                 </p>
               </article>
             </section>
@@ -810,25 +742,19 @@ export default function CustomerDetailPage() {
             <section className="form-panel">
               <div className="form-panel-header">
                 <div>
-                  <h2>
-                    Müşteri bilgilerini düzenle
-                  </h2>
-
+                  <h2>Ürün bilgilerini düzenle</h2>
                   <p>
-                    Değişiklikleri kaydetmeden önce
-                    kontrol edin.
+                    Ürün, fiyat ve stok bilgilerini
+                    güncelleyin.
                   </p>
                 </div>
               </div>
 
               <div className="form-grid">
                 <div className="form-field full">
-                  <label htmlFor="companyId">
-                    Firma *
-                  </label>
+                  <label>Firma *</label>
 
                   <select
-                    id="companyId"
                     value={form.companyId}
                     onChange={(event) =>
                       updateField(
@@ -836,7 +762,6 @@ export default function CustomerDetailPage() {
                         event.target.value
                       )
                     }
-                    disabled={isSaving}
                     required
                   >
                     {companies.map((company) => (
@@ -851,12 +776,9 @@ export default function CustomerDetailPage() {
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="name">
-                    Müşteri adı *
-                  </label>
+                  <label>Ürün adı *</label>
 
                   <input
-                    id="name"
                     value={form.name}
                     onChange={(event) =>
                       updateField(
@@ -864,273 +786,137 @@ export default function CustomerDetailPage() {
                         event.target.value
                       )
                     }
-                    maxLength={200}
-                    disabled={isSaving}
                     required
                   />
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="code">
-                    Müşteri kodu *
-                  </label>
+                  <label>Ürün kodu *</label>
 
                   <input
-                    id="code"
                     value={form.code}
                     onChange={(event) =>
                       updateField(
                         "code",
-                        event.target.value
-                          .toUpperCase()
+                        event.target.value.toUpperCase()
                       )
                     }
-                    maxLength={100}
-                    disabled={isSaving}
                     required
                   />
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="customerType">
-                    Müşteri türü *
-                  </label>
+                  <label>Barkod</label>
 
-                  <select
-                    id="customerType"
-                    value={form.customerType}
+                  <input
+                    value={form.barcode}
                     onChange={(event) =>
                       updateField(
-                        "customerType",
+                        "barcode",
                         event.target.value
                       )
                     }
-                    disabled={isSaving}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label>Birim *</label>
+
+                  <input
+                    value={form.unit}
+                    onChange={(event) =>
+                      updateField(
+                        "unit",
+                        event.target.value
+                      )
+                    }
                     required
-                  >
-                    <option value="Market">
-                      Market
-                    </option>
-
-                    <option value="Bayi">
-                      Bayi
-                    </option>
-
-                    <option value="Distribütör">
-                      Distribütör
-                    </option>
-
-                    <option value="Perakende">
-                      Perakende
-                    </option>
-
-                    <option value="Kurumsal">
-                      Kurumsal
-                    </option>
-
-                    <option value="Diğer">
-                      Diğer
-                    </option>
-                  </select>
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="taxNumber">
-                    Vergi numarası
-                  </label>
-
-                  <input
-                    id="taxNumber"
-                    value={form.taxNumber}
-                    onChange={(event) =>
-                      updateField(
-                        "taxNumber",
-                        event.target.value
-                      )
-                    }
-                    maxLength={50}
-                    disabled={isSaving}
                   />
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="contactName">
-                    Yetkili kişi
-                  </label>
+                  <label>Liste fiyatı</label>
 
                   <input
-                    id="contactName"
-                    value={form.contactName}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.listPrice}
                     onChange={(event) =>
                       updateField(
-                        "contactName",
+                        "listPrice",
                         event.target.value
                       )
                     }
-                    maxLength={200}
-                    disabled={isSaving}
                   />
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="phoneNumber">
-                    Telefon
-                  </label>
+                  <label>KDV oranı</label>
 
                   <input
-                    id="phoneNumber"
-                    type="tel"
-                    value={form.phoneNumber}
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={form.vatRate}
                     onChange={(event) =>
                       updateField(
-                        "phoneNumber",
+                        "vatRate",
                         event.target.value
                       )
                     }
-                    maxLength={30}
-                    disabled={isSaving}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label>Mevcut stok</label>
+
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={form.stockQuantity}
+                    onChange={(event) =>
+                      updateField(
+                        "stockQuantity",
+                        event.target.value
+                      )
+                    }
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label>Minimum stok</label>
+
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={
+                      form.minimumStockQuantity
+                    }
+                    onChange={(event) =>
+                      updateField(
+                        "minimumStockQuantity",
+                        event.target.value
+                      )
+                    }
                   />
                 </div>
 
                 <div className="form-field full">
-                  <label htmlFor="email">
-                    E-posta
-                  </label>
-
-                  <input
-                    id="email"
-                    type="email"
-                    value={form.email}
-                    onChange={(event) =>
-                      updateField(
-                        "email",
-                        event.target.value
-                      )
-                    }
-                    maxLength={200}
-                    disabled={isSaving}
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="city">
-                    Şehir
-                  </label>
-
-                  <input
-                    id="city"
-                    value={form.city}
-                    onChange={(event) =>
-                      updateField(
-                        "city",
-                        event.target.value
-                      )
-                    }
-                    maxLength={100}
-                    disabled={isSaving}
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="district">
-                    İlçe
-                  </label>
-
-                  <input
-                    id="district"
-                    value={form.district}
-                    onChange={(event) =>
-                      updateField(
-                        "district",
-                        event.target.value
-                      )
-                    }
-                    maxLength={100}
-                    disabled={isSaving}
-                  />
-                </div>
-
-                <div className="form-field full">
-                  <label htmlFor="address">
-                    Adres
-                  </label>
+                  <label>Açıklama</label>
 
                   <textarea
-                    id="address"
-                    rows={4}
-                    value={form.address}
-                    onChange={(event) =>
-                      updateField(
-                        "address",
-                        event.target.value
-                      )
-                    }
-                    maxLength={1000}
-                    disabled={isSaving}
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="latitude">
-                    Enlem
-                  </label>
-
-                  <input
-                    id="latitude"
-                    type="number"
-                    step="any"
-                    min="-90"
-                    max="90"
-                    value={form.latitude}
-                    onChange={(event) =>
-                      updateField(
-                        "latitude",
-                        event.target.value
-                      )
-                    }
-                    disabled={isSaving}
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="longitude">
-                    Boylam
-                  </label>
-
-                  <input
-                    id="longitude"
-                    type="number"
-                    step="any"
-                    min="-180"
-                    max="180"
-                    value={form.longitude}
-                    onChange={(event) =>
-                      updateField(
-                        "longitude",
-                        event.target.value
-                      )
-                    }
-                    disabled={isSaving}
-                  />
-                </div>
-
-                <div className="form-field full">
-                  <label htmlFor="notes">
-                    Notlar
-                  </label>
-
-                  <textarea
-                    id="notes"
                     rows={5}
-                    value={form.notes}
+                    value={form.description}
                     onChange={(event) =>
                       updateField(
-                        "notes",
+                        "description",
                         event.target.value
                       )
                     }
-                    maxLength={2000}
-                    disabled={isSaving}
                   />
                 </div>
               </div>
@@ -1140,8 +926,9 @@ export default function CustomerDetailPage() {
               <button
                 className="cancel-form-button"
                 type="button"
-                onClick={handleCancelEdit}
-                disabled={isSaving}
+                onClick={() =>
+                  setIsEditing(false)
+                }
               >
                 Vazgeç
               </button>

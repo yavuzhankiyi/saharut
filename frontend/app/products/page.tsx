@@ -8,20 +8,20 @@ import { useRouter } from "next/navigation";
 
 const API_URL = "http://localhost:5062/api/v1";
 
-interface Customer {
+interface Product {
   id: string;
   companyId: string;
   companyName: string;
   name: string;
   code: string;
-  customerType: string;
-  contactName?: string | null;
-  phoneNumber?: string | null;
-  email?: string | null;
-  taxNumber?: string | null;
-  city?: string | null;
-  district?: string | null;
+  barcode?: string | null;
+  unit: string;
+  listPrice: number;
+  vatRate: number;
+  stockQuantity: number;
+  minimumStockQuantity: number;
   isActive: boolean;
+  isLowStock: boolean;
   createdAt: string;
   updatedAt?: string | null;
 }
@@ -35,9 +35,9 @@ interface Pagination {
   hasNextPage: boolean;
 }
 
-interface CustomerResponse {
+interface ProductResponse {
   success: boolean;
-  data: Customer[];
+  data: Product[];
   pagination: Pagination;
   message?: string | null;
 }
@@ -48,11 +48,11 @@ interface UserData {
   roles: string[];
 }
 
-export default function CustomersPage() {
+export default function ProductsPage() {
   const router = useRouter();
 
-  const [customers, setCustomers] =
-    useState<Customer[]>([]);
+  const [products, setProducts] =
+    useState<Product[]>([]);
 
   const [pagination, setPagination] =
     useState<Pagination | null>(null);
@@ -63,7 +63,10 @@ export default function CustomersPage() {
   const [search, setSearch] =
     useState("");
 
-  const [activeFilter, setActiveFilter] =
+  const [statusFilter, setStatusFilter] =
+    useState("all");
+
+  const [stockFilter, setStockFilter] =
     useState("all");
 
   const [page, setPage] =
@@ -100,7 +103,7 @@ export default function CustomersPage() {
     const controller =
       new AbortController();
 
-    async function loadCustomers() {
+    async function loadProducts() {
       setIsLoading(true);
       setError("");
 
@@ -119,16 +122,23 @@ export default function CustomersPage() {
         );
       }
 
-      if (activeFilter !== "all") {
+      if (statusFilter !== "all") {
         query.set(
           "isActive",
-          activeFilter
+          statusFilter
+        );
+      }
+
+      if (stockFilter !== "all") {
+        query.set(
+          "isLowStock",
+          stockFilter
         );
       }
 
       try {
         const response = await fetch(
-          `${API_URL}/customers?${query.toString()}`,
+          `${API_URL}/products?${query.toString()}`,
           {
             headers: {
               Authorization:
@@ -145,16 +155,16 @@ export default function CustomersPage() {
         }
 
         const result =
-          (await response.json()) as CustomerResponse;
+          (await response.json()) as ProductResponse;
 
         if (!response.ok || !result.success) {
           throw new Error(
             result.message ??
-              "Müşteriler alınamadı."
+              "Ürünler alınamadı."
           );
         }
 
-        setCustomers(result.data);
+        setProducts(result.data);
         setPagination(result.pagination);
       } catch (caughtError) {
         if (
@@ -176,7 +186,7 @@ export default function CustomersPage() {
 
     const timer =
       setTimeout(
-        loadCustomers,
+        loadProducts,
         search ? 350 : 0
       );
 
@@ -185,26 +195,26 @@ export default function CustomersPage() {
       controller.abort();
     };
   }, [
-    activeFilter,
     page,
     router,
     search,
+    statusFilter,
+    stockFilter,
   ]);
 
   function handleLogout() {
-    localStorage.removeItem(
-      "saharut_access_token"
-    );
-
-    localStorage.removeItem(
-      "saharut_token_expires_at"
-    );
-
-    localStorage.removeItem(
-      "saharut_user"
-    );
-
+    localStorage.clear();
     router.replace("/");
+  }
+
+  function formatCurrency(value: number) {
+    return new Intl.NumberFormat(
+      "tr-TR",
+      {
+        style: "currency",
+        currency: "TRY",
+      }
+    ).format(value);
   }
 
   return (
@@ -215,23 +225,23 @@ export default function CustomersPage() {
         <header className="dashboard-header">
           <div>
             <span className="page-label">
-              Müşteri Yönetimi
+              Ürün Yönetimi
             </span>
 
-            <h1>Müşteriler</h1>
+            <h1>Ürünler</h1>
 
             <p>
-              Firma müşterilerini görüntüleyin,
-              arayın ve yönetin.
+              Ürün kataloğunu, fiyatları ve
+              stok durumlarını yönetin.
             </p>
           </div>
 
           <div className="header-actions">
             <Link
               className="primary-link-button"
-              href="/customers/new"
+              href="/products/new"
             >
-              + Yeni müşteri
+              + Yeni ürün
             </Link>
 
             <button
@@ -243,13 +253,13 @@ export default function CustomersPage() {
           </div>
         </header>
 
-        <section className="customer-toolbar">
+        <section className="product-toolbar">
           <div className="customer-search">
             <span>⌕</span>
 
             <input
               type="search"
-              placeholder="Müşteri adı, kodu veya telefon ara..."
+              placeholder="Ürün adı, kodu veya barkod ara..."
               value={search}
               onChange={(event) => {
                 setSearch(
@@ -261,41 +271,66 @@ export default function CustomersPage() {
             />
           </div>
 
-          <select
-            value={activeFilter}
-            onChange={(event) => {
-              setActiveFilter(
-                event.target.value
-              );
+          <div className="product-filters">
+            <select
+              value={stockFilter}
+              onChange={(event) => {
+                setStockFilter(
+                  event.target.value
+                );
 
-              setPage(1);
-            }}
-          >
-            <option value="all">
-              Tüm durumlar
-            </option>
+                setPage(1);
+              }}
+            >
+              <option value="all">
+                Tüm stoklar
+              </option>
 
-            <option value="true">
-              Aktif
-            </option>
+              <option value="true">
+                Düşük stok
+              </option>
 
-            <option value="false">
-              Pasif
-            </option>
-          </select>
+              <option value="false">
+                Stok yeterli
+              </option>
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(
+                  event.target.value
+                );
+
+                setPage(1);
+              }}
+            >
+              <option value="all">
+                Tüm durumlar
+              </option>
+
+              <option value="true">
+                Aktif
+              </option>
+
+              <option value="false">
+                Pasif
+              </option>
+            </select>
+          </div>
         </section>
 
         <section className="customer-table-panel">
           <div className="customer-table-header">
             <div>
-              <h2>Müşteri listesi</h2>
+              <h2>Ürün listesi</h2>
 
               <p>
                 Toplam{" "}
                 <strong>
                   {pagination?.totalCount ?? 0}
                 </strong>{" "}
-                müşteri
+                ürün
               </p>
             </div>
           </div>
@@ -303,12 +338,12 @@ export default function CustomersPage() {
           {isLoading ? (
             <div className="table-state">
               <div className="table-spinner" />
-              <p>Müşteriler yükleniyor...</p>
+              <p>Ürünler yükleniyor...</p>
             </div>
           ) : error ? (
             <div className="table-state error-state">
               <strong>
-                Müşteriler yüklenemedi
+                Ürünler yüklenemedi
               </strong>
 
               <p>{error}</p>
@@ -321,56 +356,67 @@ export default function CustomersPage() {
                 Tekrar dene
               </button>
             </div>
-          ) : customers.length === 0 ? (
+          ) : products.length === 0 ? (
             <div className="table-state">
               <span className="empty-customer-icon">
-                ♙
+                □
               </span>
 
               <strong>
-                Müşteri bulunamadı
+                Ürün bulunamadı
               </strong>
 
               <p>
-                Arama ölçütlerinize uygun
-                müşteri bulunmuyor.
+                Henüz ürün eklenmemiş veya filtrelere
+                uygun kayıt bulunmuyor.
               </p>
+
+              <Link
+                className="primary-link-button"
+                href="/products/new"
+              >
+                İlk ürünü ekle
+              </Link>
             </div>
           ) : (
             <>
               <div className="table-scroll">
-                <table className="customer-table">
+                <table className="product-table">
                   <thead>
                     <tr>
-                      <th>Müşteri</th>
+                      <th>Ürün</th>
                       <th>Firma</th>
-                      <th>Tür</th>
-                      <th>İletişim</th>
-                      <th>Konum</th>
+                      <th>Birim</th>
+                      <th>Fiyat</th>
+                      <th>KDV</th>
+                      <th>Stok</th>
                       <th>Durum</th>
                       <th />
                     </tr>
                   </thead>
 
                   <tbody>
-                    {customers.map(
-                      (customer) => (
-                        <tr key={customer.id}>
+                    {products.map(
+                      (product) => (
+                        <tr key={product.id}>
                           <td>
                             <div className="customer-name-cell">
-                              <div className="customer-avatar">
-                                {customer.name
+                              <div className="product-avatar">
+                                {product.name
                                   .charAt(0)
                                   .toUpperCase()}
                               </div>
 
                               <div>
                                 <strong>
-                                  {customer.name}
+                                  {product.name}
                                 </strong>
 
                                 <span>
-                                  {customer.code}
+                                  {product.code}
+                                  {product.barcode
+                                    ? ` · ${product.barcode}`
+                                    : ""}
                                 </span>
                               </div>
                             </div>
@@ -378,54 +424,60 @@ export default function CustomersPage() {
 
                           <td>
                             <span className="table-main-text">
-                              {customer.companyName}
+                              {product.companyName}
                             </span>
                           </td>
 
                           <td>
                             <span className="customer-type">
-                              {customer.customerType}
+                              {product.unit}
                             </span>
                           </td>
 
                           <td>
-                            <div className="contact-cell">
-                              <strong>
-                                {customer.contactName ??
-                                  "—"}
-                              </strong>
-
-                              <span>
-                                {customer.phoneNumber ??
-                                  customer.email ??
-                                  "İletişim bilgisi yok"}
-                              </span>
-                            </div>
+                            <strong className="product-price">
+                              {formatCurrency(
+                                product.listPrice
+                              )}
+                            </strong>
                           </td>
 
                           <td>
-                            <div className="location-cell">
+                            <span className="table-main-text">
+                              %{product.vatRate}
+                            </span>
+                          </td>
+
+                          <td>
+                            <div className="stock-cell">
                               <strong>
-                                {customer.city ??
-                                  "—"}
+                                {product.stockQuantity}
                               </strong>
 
                               <span>
-                                {customer.district ??
-                                  ""}
+                                Min.{" "}
+                                {
+                                  product.minimumStockQuantity
+                                }
                               </span>
+
+                              {product.isLowStock && (
+                                <small>
+                                  Düşük stok
+                                </small>
+                              )}
                             </div>
                           </td>
 
                           <td>
                             <span
                               className={
-                                customer.isActive
+                                product.isActive
                                   ? "status-badge active"
                                   : "status-badge passive"
                               }
                             >
-                              {customer.isActive
+                              {product.isActive
                                 ? "Aktif"
                                 : "Pasif"}
                             </span>
@@ -434,7 +486,7 @@ export default function CustomersPage() {
                           <td>
                             <Link
                               className="row-action"
-                              href={`/customers/${customer.id}`}
+                              href={`/products/${product.id}`}
                             >
                               Görüntüle
                             </Link>
