@@ -149,7 +149,37 @@ public static class DatabaseSeeder
             "Ürün Durumu Güncelleme",
             "PRODUCTS.STATUS",
             "PRODUCTS",
-            "Ürün kaydını aktif veya pasif duruma getirme yetkisi.")
+            "Ürün kaydını aktif veya pasif duruma getirme yetkisi."),
+
+        new(
+            "Müşteri Görüntüleme",
+            "CUSTOMERS.READ",
+            "CUSTOMERS",
+            "Müşteri kayıtlarını ve müşteri detaylarını görüntüleme yetkisi."),
+
+        new(
+            "Müşteri Oluşturma",
+            "CUSTOMERS.CREATE",
+            "CUSTOMERS",
+            "Yeni müşteri veya ziyaret noktası oluşturma yetkisi."),
+
+        new(
+            "Müşteri Güncelleme",
+            "CUSTOMERS.UPDATE",
+            "CUSTOMERS",
+            "Müşteri iletişim, adres ve konum bilgilerini güncelleme yetkisi."),
+
+        new(
+            "Müşteri Silme",
+            "CUSTOMERS.DELETE",
+            "CUSTOMERS",
+            "Müşteri kayıtlarını soft delete ile silme yetkisi."),
+
+        new(
+            "Müşteri Durumu Güncelleme",
+            "CUSTOMERS.STATUS",
+            "CUSTOMERS",
+            "Müşteri kaydını aktif veya pasif duruma getirme yetkisi.")
     ];
 
     private static readonly IReadOnlyDictionary<string, string[]>
@@ -178,7 +208,13 @@ public static class DatabaseSeeder
                     "PRODUCTS.CREATE",
                     "PRODUCTS.UPDATE",
                     "PRODUCTS.DELETE",
-                    "PRODUCTS.STATUS"
+                    "PRODUCTS.STATUS",
+
+                    "CUSTOMERS.READ",
+                    "CUSTOMERS.CREATE",
+                    "CUSTOMERS.UPDATE",
+                    "CUSTOMERS.DELETE",
+                    "CUSTOMERS.STATUS"
                 ],
 
                 ["MANUFACTURER_MANAGER"] =
@@ -190,7 +226,13 @@ public static class DatabaseSeeder
                     "PRODUCTS.CREATE",
                     "PRODUCTS.UPDATE",
                     "PRODUCTS.DELETE",
-                    "PRODUCTS.STATUS"
+                    "PRODUCTS.STATUS",
+
+                    "CUSTOMERS.READ",
+                    "CUSTOMERS.CREATE",
+                    "CUSTOMERS.UPDATE",
+                    "CUSTOMERS.DELETE",
+                    "CUSTOMERS.STATUS"
                 ],
 
                 ["DISTRIBUTOR_MANAGER"] =
@@ -198,19 +240,30 @@ public static class DatabaseSeeder
                     "COMPANIES.READ",
                     "USERS.READ",
 
-                    "PRODUCTS.READ"
+                    "PRODUCTS.READ",
+
+                    "CUSTOMERS.READ",
+                    "CUSTOMERS.CREATE",
+                    "CUSTOMERS.UPDATE",
+                    "CUSTOMERS.DELETE",
+                    "CUSTOMERS.STATUS"
                 ],
 
                 ["FIELD_SALES"] =
                 [
                     "COMPANIES.READ",
-                    "PRODUCTS.READ"
+                    "PRODUCTS.READ",
+
+                    "CUSTOMERS.READ",
+                    "CUSTOMERS.CREATE",
+                    "CUSTOMERS.UPDATE"
                 ],
 
                 ["FINANCE_MANAGER"] =
                 [
                     "COMPANIES.READ",
-                    "PRODUCTS.READ"
+                    "PRODUCTS.READ",
+                    "CUSTOMERS.READ"
                 ]
             };
 

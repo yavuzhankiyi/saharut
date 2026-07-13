@@ -17,4 +17,7 @@ public sealed class Company : BaseEntity
 
     public ICollection<Product> Products { get; set; }
         = new List<Product>();
+
+    public ICollection<Customer> Customers { get; set; } =
+    new List<Customer>();
 }
