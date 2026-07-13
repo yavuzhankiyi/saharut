@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Saharut.Domain.Entities;
 
 namespace Saharut.Infrastructure.Persistence;
@@ -179,7 +179,55 @@ public static class DatabaseSeeder
             "Müşteri Durumu Güncelleme",
             "CUSTOMERS.STATUS",
             "CUSTOMERS",
-            "Müşteri kaydını aktif veya pasif duruma getirme yetkisi.")
+            "Müşteri kaydını aktif veya pasif duruma getirme yetkisi."),
+
+        new(
+            "Ziyaret Görüntüleme",
+            "VISITS.READ",
+            "VISITS",
+            "Ziyaret kayıtlarını ve ziyaret detaylarını görüntüleme yetkisi."),
+
+        new(
+            "Ziyaret Oluşturma",
+            "VISITS.CREATE",
+            "VISITS",
+            "Yeni saha ziyareti planlama yetkisi."),
+
+        new(
+            "Ziyaret Güncelleme",
+            "VISITS.UPDATE",
+            "VISITS",
+            "Planlanmış ziyaret bilgilerini ve personel atamasını güncelleme yetkisi."),
+
+        new(
+            "Ziyaret Silme",
+            "VISITS.DELETE",
+            "VISITS",
+            "Ziyaret kayıtlarını soft delete ile silme yetkisi."),
+
+        new(
+            "Ziyaret Check-in",
+            "VISITS.CHECK_IN",
+            "VISITS",
+            "Saha ziyaretinde konum bilgisiyle check-in yapma yetkisi."),
+
+        new(
+            "Ziyaret Check-out",
+            "VISITS.CHECK_OUT",
+            "VISITS",
+            "Saha ziyaretinden konum bilgisiyle check-out yapma yetkisi."),
+
+        new(
+            "Ziyaret Tamamlama",
+            "VISITS.COMPLETE",
+            "VISITS",
+            "Ziyaret sonucunu kaydederek ziyareti tamamlama yetkisi."),
+
+        new(
+            "Ziyaret İptal Etme",
+            "VISITS.CANCEL",
+            "VISITS",
+            "Planlanmış veya başlamış ziyareti iptal etme yetkisi.")
     ];
 
     private static readonly IReadOnlyDictionary<string, string[]>
@@ -214,7 +262,16 @@ public static class DatabaseSeeder
                     "CUSTOMERS.CREATE",
                     "CUSTOMERS.UPDATE",
                     "CUSTOMERS.DELETE",
-                    "CUSTOMERS.STATUS"
+                    "CUSTOMERS.STATUS",
+
+                    "VISITS.READ",
+                    "VISITS.CREATE",
+                    "VISITS.UPDATE",
+                    "VISITS.DELETE",
+                    "VISITS.CHECK_IN",
+                    "VISITS.CHECK_OUT",
+                    "VISITS.COMPLETE",
+                    "VISITS.CANCEL"
                 ],
 
                 ["MANUFACTURER_MANAGER"] =
@@ -232,7 +289,16 @@ public static class DatabaseSeeder
                     "CUSTOMERS.CREATE",
                     "CUSTOMERS.UPDATE",
                     "CUSTOMERS.DELETE",
-                    "CUSTOMERS.STATUS"
+                    "CUSTOMERS.STATUS",
+
+                    "VISITS.READ",
+                    "VISITS.CREATE",
+                    "VISITS.UPDATE",
+                    "VISITS.DELETE",
+                    "VISITS.CHECK_IN",
+                    "VISITS.CHECK_OUT",
+                    "VISITS.COMPLETE",
+                    "VISITS.CANCEL"
                 ],
 
                 ["DISTRIBUTOR_MANAGER"] =
@@ -246,7 +312,16 @@ public static class DatabaseSeeder
                     "CUSTOMERS.CREATE",
                     "CUSTOMERS.UPDATE",
                     "CUSTOMERS.DELETE",
-                    "CUSTOMERS.STATUS"
+                    "CUSTOMERS.STATUS",
+
+                    "VISITS.READ",
+                    "VISITS.CREATE",
+                    "VISITS.UPDATE",
+                    "VISITS.DELETE",
+                    "VISITS.CHECK_IN",
+                    "VISITS.CHECK_OUT",
+                    "VISITS.COMPLETE",
+                    "VISITS.CANCEL"
                 ],
 
                 ["FIELD_SALES"] =
@@ -256,14 +331,23 @@ public static class DatabaseSeeder
 
                     "CUSTOMERS.READ",
                     "CUSTOMERS.CREATE",
-                    "CUSTOMERS.UPDATE"
+                    "CUSTOMERS.UPDATE",
+
+                    "VISITS.READ",
+                    "VISITS.CREATE",
+                    "VISITS.UPDATE",
+                    "VISITS.CHECK_IN",
+                    "VISITS.CHECK_OUT",
+                    "VISITS.COMPLETE",
+                    "VISITS.CANCEL"
                 ],
 
                 ["FINANCE_MANAGER"] =
                 [
                     "COMPANIES.READ",
                     "PRODUCTS.READ",
-                    "CUSTOMERS.READ"
+                    "CUSTOMERS.READ",
+                    "VISITS.READ"
                 ]
             };
 

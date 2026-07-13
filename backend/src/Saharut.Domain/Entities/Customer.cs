@@ -1,4 +1,4 @@
-namespace Saharut.Domain.Entities;
+﻿namespace Saharut.Domain.Entities;
 
 public sealed class Customer : BaseEntity
 {
@@ -33,4 +33,7 @@ public sealed class Customer : BaseEntity
     public bool IsActive { get; set; } = true;
 
     public required Company Company { get; set; }
+
+    public ICollection<Visit> Visits { get; set; } =
+        new List<Visit>();
 }

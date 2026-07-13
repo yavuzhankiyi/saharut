@@ -1,4 +1,4 @@
-namespace Saharut.Domain.Entities;
+﻿namespace Saharut.Domain.Entities;
 
 public sealed class User : BaseEntity
 {
@@ -16,9 +16,12 @@ public sealed class User : BaseEntity
 
     public DateTime? LastLoginAt { get; set; }
 
-    public ICollection<UserRole> UserRoles { get; set; }
-    = new List<UserRole>();
+    public ICollection<UserRole> UserRoles { get; set; } =
+        new List<UserRole>();
 
-public ICollection<CompanyUser> CompanyUsers { get; set; }
-    = new List<CompanyUser>();
+    public ICollection<CompanyUser> CompanyUsers { get; set; } =
+        new List<CompanyUser>();
+
+    public ICollection<Visit> AssignedVisits { get; set; } =
+        new List<Visit>();
 }

@@ -44,6 +44,9 @@ public sealed class SaharutDbContext : DbContext
     public DbSet<Customer> Customers =>
         Set<Customer>();
 
+    public DbSet<Visit> Visits =>
+    Set<Visit>();
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
@@ -59,7 +62,8 @@ public sealed class SaharutDbContext : DbContext
         ConfigureRolePermission(modelBuilder);
         ConfigureAuditLog(modelBuilder);
         ConfigureProduct(modelBuilder);
-        ConfigureCustomer(modelBuilder);
+        ConfigureVisit(modelBuilder);
+        
     }
 
     private static void ConfigureCompany(
@@ -614,4 +618,115 @@ public sealed class SaharutDbContext : DbContext
                 customer.IsDeleted);
         });
     }
+
+    private static void ConfigureVisit(
+    ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<Visit>(entity =>
+    {
+        entity.ToTable("visits");
+
+        entity.HasKey(visit =>
+            visit.Id);
+
+        entity.Property(visit =>
+                visit.Title)
+            .HasMaxLength(200)
+            .IsRequired();
+
+        entity.Property(visit =>
+                visit.Purpose)
+            .HasMaxLength(1000);
+
+        entity.Property(visit =>
+                visit.Status)
+            .HasConversion<int>()
+            .IsRequired();
+
+        entity.Property(visit =>
+                visit.CheckInLatitude)
+            .HasPrecision(10, 7);
+
+        entity.Property(visit =>
+                visit.CheckInLongitude)
+            .HasPrecision(10, 7);
+
+        entity.Property(visit =>
+                visit.CheckOutLatitude)
+            .HasPrecision(10, 7);
+
+        entity.Property(visit =>
+                visit.CheckOutLongitude)
+            .HasPrecision(10, 7);
+
+        entity.Property(visit =>
+                visit.Outcome)
+            .HasMaxLength(2000);
+
+        entity.Property(visit =>
+                visit.Notes)
+            .HasMaxLength(2000);
+
+        entity.Property(visit =>
+                visit.CancellationReason)
+            .HasMaxLength(1000);
+
+        entity.HasOne(visit =>
+                visit.Company)
+            .WithMany(company =>
+                company.Visits)
+            .HasForeignKey(visit =>
+                visit.CompanyId)
+            .OnDelete(
+                DeleteBehavior.Restrict);
+
+        entity.HasOne(visit =>
+                visit.Customer)
+            .WithMany(customer =>
+                customer.Visits)
+            .HasForeignKey(visit =>
+                visit.CustomerId)
+            .OnDelete(
+                DeleteBehavior.Restrict);
+
+        entity.HasOne(visit =>
+                visit.AssignedUser)
+            .WithMany(user =>
+                user.AssignedVisits)
+            .HasForeignKey(visit =>
+                visit.AssignedUserId)
+            .OnDelete(
+                DeleteBehavior.Restrict);
+
+        entity.HasIndex(visit =>
+            visit.CompanyId);
+
+        entity.HasIndex(visit =>
+            visit.CustomerId);
+
+        entity.HasIndex(visit =>
+            visit.AssignedUserId);
+
+        entity.HasIndex(visit =>
+            visit.Status);
+
+        entity.HasIndex(visit =>
+            visit.PlannedStartAt);
+
+        entity.HasIndex(visit => new
+        {
+            visit.CompanyId,
+            visit.PlannedStartAt
+        });
+
+        entity.HasIndex(visit => new
+        {
+            visit.AssignedUserId,
+            visit.PlannedStartAt
+        });
+
+        entity.HasIndex(visit =>
+            visit.IsDeleted);
+    });
+}
 }
