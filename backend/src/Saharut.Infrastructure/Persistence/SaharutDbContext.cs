@@ -21,6 +21,8 @@ public sealed class SaharutDbContext : DbContext
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    public DbSet<Product> Products => Set<Product>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -34,6 +36,8 @@ public sealed class SaharutDbContext : DbContext
         ConfigurePermission(modelBuilder);
         ConfigureRolePermission(modelBuilder);
         ConfigureAuditLog(modelBuilder);
+        ConfigureProduct(modelBuilder);
+        
     }
 
     private static void ConfigureCompany(ModelBuilder modelBuilder)
@@ -311,4 +315,66 @@ public sealed class SaharutDbContext : DbContext
             entity.HasIndex(auditLog => auditLog.Action);
         });
     }
+
+    private static void ConfigureProduct(
+    ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<Product>(entity =>
+    {
+        entity.ToTable("products");
+
+        entity.HasKey(product => product.Id);
+
+        entity.Property(product => product.Name)
+            .HasMaxLength(200)
+            .IsRequired();
+
+        entity.Property(product => product.Code)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        entity.Property(product => product.Barcode)
+            .HasMaxLength(100);
+
+        entity.Property(product => product.Description)
+            .HasMaxLength(1000);
+
+        entity.Property(product => product.Unit)
+            .HasMaxLength(50)
+            .IsRequired();
+
+        entity.Property(product => product.ListPrice)
+            .HasPrecision(18, 2);
+
+        entity.Property(product => product.VatRate)
+            .HasPrecision(5, 2);
+
+        entity.Property(product => product.StockQuantity)
+            .HasPrecision(18, 3);
+
+        entity.Property(product => product.MinimumStockQuantity)
+            .HasPrecision(18, 3);
+
+        entity.HasIndex(product => new
+        {
+            product.CompanyId,
+            product.Code
+        }).IsUnique();
+
+        entity.HasIndex(product => product.Barcode);
+
+        entity.HasIndex(product => product.Name);
+
+        entity.HasIndex(product => new
+        {
+            product.CompanyId,
+            product.IsActive
+        });
+
+        entity.HasOne(product => product.Company)
+            .WithMany(company => company.Products)
+            .HasForeignKey(product => product.CompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+    });
+}
 }

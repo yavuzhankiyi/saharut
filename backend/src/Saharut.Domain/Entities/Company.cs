@@ -13,5 +13,8 @@ public sealed class Company : BaseEntity
     public bool IsActive { get; set; } = true;
 
     public ICollection<CompanyUser> CompanyUsers { get; set; }
-    = new List<CompanyUser>();
+        = new List<CompanyUser>();
+
+    public ICollection<Product> Products { get; set; }
+        = new List<Product>();
 }

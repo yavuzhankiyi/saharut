@@ -115,11 +115,41 @@ public static class DatabaseSeeder
             "PERMISSIONS",
             "Rollere permission atama ve rol üzerinden permission kaldırma yetkisi."),
 
-            new(
-    "Audit Log Görüntüleme",
-    "AUDIT_LOGS.READ",
-    "AUDIT_LOGS",
-    "Sistem işlem geçmişini ve kayıt değişikliklerini görüntüleme yetkisi.")
+        new(
+            "Audit Log Görüntüleme",
+            "AUDIT_LOGS.READ",
+            "AUDIT_LOGS",
+            "Sistem işlem geçmişini ve kayıt değişikliklerini görüntüleme yetkisi."),
+
+        new(
+            "Ürün Görüntüleme",
+            "PRODUCTS.READ",
+            "PRODUCTS",
+            "Ürün kayıtlarını ve ürün detaylarını görüntüleme yetkisi."),
+
+        new(
+            "Ürün Oluşturma",
+            "PRODUCTS.CREATE",
+            "PRODUCTS",
+            "Yeni ürün kaydı oluşturma yetkisi."),
+
+        new(
+            "Ürün Güncelleme",
+            "PRODUCTS.UPDATE",
+            "PRODUCTS",
+            "Ürün bilgilerini, fiyatını ve stok bilgilerini güncelleme yetkisi."),
+
+        new(
+            "Ürün Silme",
+            "PRODUCTS.DELETE",
+            "PRODUCTS",
+            "Ürün kayıtlarını soft delete ile silme yetkisi."),
+
+        new(
+            "Ürün Durumu Güncelleme",
+            "PRODUCTS.STATUS",
+            "PRODUCTS",
+            "Ürün kaydını aktif veya pasif duruma getirme yetkisi.")
     ];
 
     private static readonly IReadOnlyDictionary<string, string[]>
@@ -142,29 +172,45 @@ public static class DatabaseSeeder
                     "USERS.CREATE",
                     "USERS.UPDATE",
 
-                    "ROLES.READ"
+                    "ROLES.READ",
+
+                    "PRODUCTS.READ",
+                    "PRODUCTS.CREATE",
+                    "PRODUCTS.UPDATE",
+                    "PRODUCTS.DELETE",
+                    "PRODUCTS.STATUS"
                 ],
 
                 ["MANUFACTURER_MANAGER"] =
                 [
                     "COMPANIES.READ",
-                    "USERS.READ"
+                    "USERS.READ",
+
+                    "PRODUCTS.READ",
+                    "PRODUCTS.CREATE",
+                    "PRODUCTS.UPDATE",
+                    "PRODUCTS.DELETE",
+                    "PRODUCTS.STATUS"
                 ],
 
                 ["DISTRIBUTOR_MANAGER"] =
                 [
                     "COMPANIES.READ",
-                    "USERS.READ"
+                    "USERS.READ",
+
+                    "PRODUCTS.READ"
                 ],
 
                 ["FIELD_SALES"] =
                 [
-                    "COMPANIES.READ"
+                    "COMPANIES.READ",
+                    "PRODUCTS.READ"
                 ],
 
                 ["FINANCE_MANAGER"] =
                 [
-                    "COMPANIES.READ"
+                    "COMPANIES.READ",
+                    "PRODUCTS.READ"
                 ]
             };
 
@@ -235,6 +281,7 @@ public static class DatabaseSeeder
         CancellationToken cancellationToken)
     {
         var roleCodes = RolePermissionMap.Keys.ToArray();
+
         var permissionCodes = PermissionSeeds
             .Select(permission => permission.Code)
             .ToArray();
