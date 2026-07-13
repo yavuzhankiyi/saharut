@@ -227,7 +227,13 @@ public static class DatabaseSeeder
             "Ziyaret İptal Etme",
             "VISITS.CANCEL",
             "VISITS",
-            "Planlanmış veya başlamış ziyareti iptal etme yetkisi.")
+            "Planlanmış veya başlamış ziyareti iptal etme yetkisi."),
+
+        new(
+            "Dashboard Görüntüleme",
+            "DASHBOARD.READ",
+            "DASHBOARD",
+            "Operasyon, müşteri, ürün ve ziyaret özetlerini görüntüleme yetkisi.")
     ];
 
     private static readonly IReadOnlyDictionary<string, string[]>
@@ -271,7 +277,9 @@ public static class DatabaseSeeder
                     "VISITS.CHECK_IN",
                     "VISITS.CHECK_OUT",
                     "VISITS.COMPLETE",
-                    "VISITS.CANCEL"
+                    "VISITS.CANCEL",
+
+                    "DASHBOARD.READ"
                 ],
 
                 ["MANUFACTURER_MANAGER"] =
@@ -298,7 +306,9 @@ public static class DatabaseSeeder
                     "VISITS.CHECK_IN",
                     "VISITS.CHECK_OUT",
                     "VISITS.COMPLETE",
-                    "VISITS.CANCEL"
+                    "VISITS.CANCEL",
+
+                    "DASHBOARD.READ"
                 ],
 
                 ["DISTRIBUTOR_MANAGER"] =
@@ -321,7 +331,9 @@ public static class DatabaseSeeder
                     "VISITS.CHECK_IN",
                     "VISITS.CHECK_OUT",
                     "VISITS.COMPLETE",
-                    "VISITS.CANCEL"
+                    "VISITS.CANCEL",
+
+                    "DASHBOARD.READ"
                 ],
 
                 ["FIELD_SALES"] =
@@ -339,7 +351,9 @@ public static class DatabaseSeeder
                     "VISITS.CHECK_IN",
                     "VISITS.CHECK_OUT",
                     "VISITS.COMPLETE",
-                    "VISITS.CANCEL"
+                    "VISITS.CANCEL",
+
+                    "DASHBOARD.READ"
                 ],
 
                 ["FINANCE_MANAGER"] =
@@ -347,7 +361,8 @@ public static class DatabaseSeeder
                     "COMPANIES.READ",
                     "PRODUCTS.READ",
                     "CUSTOMERS.READ",
-                    "VISITS.READ"
+                    "VISITS.READ",
+                    "DASHBOARD.READ"
                 ]
             };
 
@@ -506,3 +521,4 @@ public static class DatabaseSeeder
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }
+
