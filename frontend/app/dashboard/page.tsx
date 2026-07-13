@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const API_URL = "http://localhost:5062/api/v1";
 
@@ -199,10 +200,10 @@ export default function DashboardPage() {
             Firmalar
           </a>
 
-          <a href="#">
-            <span>♙</span>
-            Müşteriler
-          </a>
+          <Link href="/customers">
+  <span>♙</span>
+  Müşteriler
+</Link>
 
           <a href="#">
             <span>□</span>
