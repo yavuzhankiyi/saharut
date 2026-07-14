@@ -27,3 +27,17 @@ Thumbs.db
 
 # User uploads
 uploads/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env.production
+
+# Backend
+**/*.user
+**/*.suo
+
+# Local files
+visit-frontend-current.txt
